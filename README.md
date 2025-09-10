@@ -1,11 +1,11 @@
-# PiCoder: Standalone Streamlit Chat App for xAI Grok API
+# HomeBot: Standalone Streamlit Chat App for xAI Grok API
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.38.0-red.svg)](https://streamlit.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform: Raspberry Pi 5](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-orange.svg)](https://www.raspberrypi.com/products/raspberry-pi-5/)
 
-PiCoder is a production-level, standalone Streamlit-based chat application designed for Raspberry Pi 5 (or compatible systems). It integrates with the xAI Grok API (via OpenAI SDK compatibility) to provide a seamless, streaming chat experience with an advanced AI assistant called HomeBot. The app supports user authentication, conversation history, customizable system prompts, image uploads for vision tasks, and a suite of sandboxed tools for tasks like file management, code execution, and memory persistence.
+HomeBot is a production-level, standalone Streamlit-based chat application designed for Raspberry Pi 5 (or compatible systems). It integrates with the xAI Grok API (via OpenAI SDK compatibility) to provide a seamless, streaming chat experience with an advanced AI assistant called HomeBot. The app supports user authentication, conversation history, customizable system prompts, image uploads for vision tasks, and a suite of sandboxed tools for tasks like file management, code execution, and memory persistence.
 
 This app is optimized for local hosting in a Python virtual environment, with a focus on safety, efficiency, and extensibility. It includes advanced features like brain-inspired memory consolidation using embeddings and vector similarity searches.
 
@@ -95,8 +95,8 @@ Tools follow rules: Plan in advance, batch calls, avoid redundancy, limit iterat
 ### Step-by-Step Setup
 1. **Clone the Repository**:
    ```
-   git clone https://github.com/yourusername/picoder.git
-   cd picoder
+   git clone https://github.com/yourusername/HomeBot.git
+   cd HomeBot
    ```
 
 2. **Create and Activate Virtual Environment**:
@@ -159,7 +159,7 @@ Tools follow rules: Plan in advance, batch calls, avoid redundancy, limit iterat
 5. **Customization**: Edit prompts in sidebar; toggle dark mode.
 
 ## Contributing
-Contributions welcome! Fork the repo, create a feature branch, and submit a PR. Follow PEP 8 for code style. Report issues [here](https://github.com/yourusername/picoder/issues).
+Contributions welcome! Fork the repo, create a feature branch, and submit a PR. Follow PEP 8 for code style. Report issues [here](https://github.com/buckster123/homebot/issues).
 
 ## License
 MIT License. See [LICENSE](LICENSE) for details.
