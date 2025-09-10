@@ -97,7 +97,7 @@ Tools follow rules: Plan in advance, batch calls, avoid redundancy, limit iterat
 ### Step-by-Step Setup
 1. **Clone the Repository**:
    ```
-   git clone https://github.com/yourusername/HomeBot.git
+   git clone https://github.com/buckster123/HomeBot.git
    cd HomeBot
    ```
 
@@ -164,7 +164,7 @@ Tools follow rules: Plan in advance, batch calls, avoid redundancy, limit iterat
 For nerds: Debug tool calls by printing in `api.py`'s generator; extend UI in `ui.py` (e.g., add real-time metrics).
 
 ## Contributing
-Contributions welcome! Fork the repo, create a feature branch, and submit a PR. Follow PEP 8 for code style. Report issues [here](https://github.com/buckster123/homebot/issues). For nerds: Add tests with pytest; profile changes with cProfile.
+Contributions welcome! Fork the repo, create a feature branch, and submit a PR. Follow PEP 8 for code style. Report issues [here](https://github.com/buckster123/HomeBot/issues). For nerds: Add tests with pytest; profile changes with cProfile.
 
 ## License
 MIT License. See [LICENSE](LICENSE) for details.
