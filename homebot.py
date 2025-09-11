@@ -1,29 +1,29 @@
 import streamlit as st
 import os
-from openai import OpenAI  # Using OpenAI SDK for xAI compatibility and streaming
+from openai import OpenAI  
 from passlib.hash import sha256_crypt
 import sqlite3
 from dotenv import load_dotenv
 import json
 import time
-import base64  # For image handling
-import traceback  # For error logging
-import ntplib  # For NTP time sync; pip install ntplib
-import io  # For capturing code output
-import sys  # For stdout redirection
-import pygit2  # For git_ops; pip install pygit2
-import subprocess  # Already imported, but explicit
-import requests  # For api_simulate; pip install requests
-from black import format_str, FileMode  # For code_lint; pip install black
-import numpy as np  # For embeddings
-from sentence_transformers import SentenceTransformer  # For advanced memory; pip install sentence-transformers torch
-from datetime import datetime, timedelta  # For pruning
-import jsbeautifier  # For JS/CSS linting; pip install jsbeautifier
-import yaml  # For YAML; pip install pyyaml
-import sqlparse  # For SQL; pip install sqlparse
-from bs4 import BeautifulSoup  # For HTML; pip install beautifulsoup4
-import xml.dom.minidom  # Built-in for XML
-import tempfile  # For temp files in linting
+import base64  
+import traceback  
+import ntplib  
+import io 
+import sys 
+import pygit2 
+import subprocess
+import requests
+from black import format_str, FileMode
+import numpy as np
+from sentence_transformers import SentenceTransformer 
+from datetime import datetime, timedelta
+import jsbeautifier
+import yaml
+import sqlparse
+from bs4 import BeautifulSoup
+import xml.dom.minidom
+import tempfile
 
 # Load environment variables
 load_dotenv()
@@ -43,7 +43,6 @@ conn.load_extension(vec_path)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS history (user TEXT, convo_id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, messages TEXT)''')
-# NEW: Memory table for hybrid hierarchy (key-value with timestamp/index for fast queries)
 c.execute('''CREATE TABLE IF NOT EXISTS memory (
     user TEXT,
     convo_id INTEGER,  -- Links to history for per-session
@@ -53,11 +52,10 @@ c.execute('''CREATE TABLE IF NOT EXISTS memory (
     PRIMARY KEY (user, convo_id, mem_key)
 )''')
 c.execute('CREATE INDEX IF NOT EXISTS idx_memory_timestamp ON memory (timestamp)')  # For fast time-based queries
-# Add columns for advanced memory if not exist
 try:
     c.execute("ALTER TABLE memory ADD COLUMN embedding BLOB")
 except sqlite3.OperationalError:
-    pass  # Already exists
+    pass 
 try:
     c.execute("ALTER TABLE memory ADD COLUMN salience REAL DEFAULT 1.0")
 except sqlite3.OperationalError:
@@ -68,15 +66,12 @@ except sqlite3.OperationalError:
     pass
 conn.commit()
 
-# Load embedding model once (sentence-transformers 'all-MiniLM-L6-v2')
 if 'embed_model' not in st.session_state:
     st.session_state['embed_model'] = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Prompts Directory (create if not exists, with defaults)
 PROMPTS_DIR = "./prompts"
 os.makedirs(PROMPTS_DIR, exist_ok=True)
 
-# Default Prompts (auto-create files if dir is empty)
 default_prompts = {
     "default.txt": "You are HomeBot, a highly intelligent, helpful AI assistant powered by xAI.",
     "coder.txt": "You are an expert coder, providing precise code solutions.",
@@ -98,21 +93,17 @@ api_simulate(url, method optional, data optional, mock optional): Simulate API c
 Invoke tools via structured calls, then incorporate results into your response. Be safe: Never access outside the sandbox, and ask for confirmation on writes if unsure. Limit to one tool per response to avoid loops. When outputting tags or code in your final response text (e.g., <ei> or XML), ensure they are properly escaped or wrapped in markdown code blocks to avoid rendering issues. However, when providing arguments for tools (e.g., the 'content' parameter in fs_write_file), always use the exact, literal, unescaped string content without any modifications."""
 }
 
-# Auto-create defaults if no files
 if not any(f.endswith('.txt') for f in os.listdir(PROMPTS_DIR)):
     for filename, content in default_prompts.items():
         with open(os.path.join(PROMPTS_DIR, filename), 'w') as f:
             f.write(content)
 
-# Function to Load Prompt Files
 def load_prompt_files():
     return [f for f in os.listdir(PROMPTS_DIR) if f.endswith('.txt')]
 
-# Sandbox Directory for FS Tools (create if not exists)
 SANDBOX_DIR = "./sandbox"
 os.makedirs(SANDBOX_DIR, exist_ok=True)
 
-# Custom CSS for Pretty UI (Neon Gradient Theme, Chat Bubbles, Responsive)
 st.markdown("""<style>
     body {
         background: linear-gradient(to right, #1f1c2c, #928DAB);
@@ -161,15 +152,12 @@ st.markdown("""<style>
 </style>
 """, unsafe_allow_html=True)
 
-# Helper: Hash Password
 def hash_password(password):
     return sha256_crypt.hash(password)
 
-# Helper: Verify Password
 def verify_password(stored, provided):
     return sha256_crypt.verify(provided, stored)
 
-# Tool Functions (Sandboxed) - Unchanged
 def fs_read_file(file_path: str) -> str:
     """Read file content from sandbox (supports subdirectories)."""
     if not file_path:
@@ -323,7 +311,6 @@ def memory_query(user: str, convo_id: int, mem_key: str = None, limit: int = 10)
     except Exception as e:
         return f"Error querying memory: {str(e)}"
 
-# Advanced Memory Functions (Brain-inspired) - Unchanged
 def advanced_memory_consolidate(user: str, convo_id: int, mem_key: str, interaction_data: dict) -> str:
     """Consolidate: Summarize (via Grok call), embed, store hierarchically."""
     try:
@@ -401,7 +388,6 @@ def advanced_memory_prune(user: str, convo_id: int) -> str:
     except Exception as e:
         return f"Error pruning memory: {str(e)}"
 
-# Git Ops Tool - Unchanged
 def git_ops(operation: str, repo_path: str = "", **kwargs) -> str:
     """Perform basic Git operations in sandboxed repo."""
     if not repo_path:
@@ -476,7 +462,6 @@ def shell_exec(command: str) -> str:
     except Exception as e:
         return f"Shell error: {str(e)}"
 
-# Code Lint Tool - Updated for additional languages
 def code_lint(language: str, code: str) -> str:
     """Lint and format code snippets for multiple languages."""
     lang = language.lower()
@@ -578,7 +563,6 @@ def langsearch_web_search(query: str, freshness: str = "noLimit", summary: bool 
     except Exception as e:
         return f"LangSearch error: {str(e)}"
 
-# Tool Schema for Structured Outputs - Updated for code_lint
 TOOLS = [
     {
         "type": "function",
@@ -1013,7 +997,6 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
         time.sleep(5)
         return call_xai_api(model, messages, sys_prompt, stream, image_files, enable_tools)  # Retry
 
-# Login Page - Unchanged
 def login_page():
     st.title("Welcome to PiCoder")
     st.subheader("Login or Register")
@@ -1049,7 +1032,6 @@ def login_page():
                     conn.commit()
                     st.success("Registered! Please login.")
 
-# Chat Page - Updated for parsed final answer outside expander
 def chat_page():
     st.title(f"Grok Chat - {st.session_state['user']}")
     # Sidebar: Settings and History - Unchanged
