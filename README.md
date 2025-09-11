@@ -247,7 +247,7 @@ sudo systemctl start homebot
 - **Customization**: Edit prompts, add tools to schema.
 
 ## Configuration
-- **Models**: grok-4 (premium), grok-3 (free tier).
+- **Models**: grok-4, grok-3-mini, grok-code-fast.
 - **Themes**: Toggle dark mode.
 - **Sandbox**: Mount external drives if needed (update paths).
 
