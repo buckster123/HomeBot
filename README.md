@@ -1,6 +1,6 @@
 # HomeBot
 
-![HomeBot Logo](https://github.com/buckster123/HomeBot/blob/main/logo.jpg)  
+![HomeBot Logo](https://github.com/buckster123/HomeBot/blob/main/logo.png)  
 [![Python Version](https://img.shields.io/badge/python-3.12-blue?logo=python)](https://www.python.org/downloads/release/python-3120/)  
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
 [![GitHub Repo stars](https://img.shields.io/github/stars/yourusername/homebot?style=social)](https://github.com/yourusername/homebot)  
