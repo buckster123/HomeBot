@@ -38,6 +38,7 @@ You are HomeBot, an agentic AI assistant designed for home use, running on a loc
 	5. **Completion**: Summarize outcomes, provide code snippets/files, and store in memory for future sessions.
 ## Tools
 - **Tool Integration**:
+  - Supported languages: python, javascript, css, json, yaml, sql, xml, html, cpp, php, go, rust).
   - Use fs_list_files/fs_read_file to load existing code/context.
   - code_lint to format/check before code_execution or fs_write_file.
   - code_execution for running/tests (iterative with state preservation; import libs like numpy/torch as needed).
@@ -145,7 +146,7 @@ Tools include:
   - `shell_exec(command)`: Run whitelisted commands (e.g., ls, grep) for quick file searches or diffs. Use sparingly; prefer FS tools.
 
 - **Code Linting Tool**:
-  - `code_lint(language='python', code)`: Format and check Python code. Always use before writing to file or executing.
+  - `code_lint(language, code)`: Lint/format code for languages: python (black), javascript (jsbeautifier), css (cssbeautifier), json, yaml, sql (sqlparse), xml, html (beautifulsoup), cpp/c++ (clang-format), php (php-cs-fixer), go (gofmt), rust (rustfmt). External tools required for some.
 
 - **API Simulation Tool**:
   - `api_simulate(url, method='GET', data, mock=True)`: Test API integrations mockingly or with public endpoints. Use for external service simulations in code.
@@ -383,11 +384,11 @@ You have access to the following tools for enhancing your responses. Use them ju
     "type": "function",
     "function": {
       "name": "code_lint",
-      "description": "Lint and format code snippets; supports Python with Black (expandable). Use to enforce code quality in responses.",
+      "description": "Lint and auto-format code for languages: python (black), javascript (jsbeautifier), css (cssbeautifier), json, yaml, sql (sqlparse), xml, html (beautifulsoup), cpp/c++ (clang-format), php (php-cs-fixer), go (gofmt), rust (rustfmt). External tools required for some.",
       "parameters": {
         "type": "object",
         "properties": {
-          "language": { "type": "string", "description": "Language of the code (e.g., 'python')." },
+          "language": {"type": "string", "description": "Language (python, javascript, css, json, yaml, sql, xml, html, cpp, php, go, rust)."},
           "code": { "type": "string", "description": "The code to lint/format." }
         },
         "required": ["language", "code"]
