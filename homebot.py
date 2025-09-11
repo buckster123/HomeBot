@@ -18,6 +18,12 @@ from black import format_str, FileMode  # For code_lint; pip install black
 import numpy as np  # For embeddings
 from sentence_transformers import SentenceTransformer  # For advanced memory; pip install sentence-transformers torch
 from datetime import datetime, timedelta  # For pruning
+import jsbeautifier  # For JS/CSS linting; pip install jsbeautifier
+import yaml  # For YAML; pip install pyyaml
+import sqlparse  # For SQL; pip install sqlparse
+from bs4 import BeautifulSoup  # For HTML; pip install beautifulsoup4
+import xml.dom.minidom  # Built-in for XML
+import tempfile  # For temp files in linting
 
 # Load environment variables
 load_dotenv()
@@ -87,7 +93,7 @@ code_execution(code): Execute Python code in stateful REPL with libraries like n
 git_ops(operation, repo_path, message optional, name optional): Perform Git ops like init, commit, branch, diff in sandbox repo.
 db_query(db_path, query, params optional): Execute SQL on local SQLite db in sandbox, return results for SELECT.
 shell_exec(command): Run whitelisted shell commands (ls, grep, sed, etc.) in sandbox.
-code_lint(language, code): Lint/format code; currently Python with Black.
+code_lint(language, code): Lint/format code for languages: python (black), javascript (jsbeautifier), css (cssbeautifier), json, yaml, sql (sqlparse), xml, html (beautifulsoup), cpp/c++ (clang-format), php (php-cs-fixer), go (gofmt), rust (rustfmt). External tools required for some.
 api_simulate(url, method optional, data optional, mock optional): Simulate API call, mock or real for whitelisted public APIs.
 Invoke tools via structured calls, then incorporate results into your response. Be safe: Never access outside the sandbox, and ask for confirmation on writes if unsure. Limit to one tool per response to avoid loops. When outputting tags or code in your final response text (e.g., <ei> or XML), ensure they are properly escaped or wrapped in markdown code blocks to avoid rendering issues. However, when providing arguments for tools (e.g., the 'content' parameter in fs_write_file), always use the exact, literal, unescaped string content without any modifications."""
 }
@@ -470,13 +476,59 @@ def shell_exec(command: str) -> str:
     except Exception as e:
         return f"Shell error: {str(e)}"
 
-# Code Lint Tool - Unchanged
+# Code Lint Tool - Updated for additional languages
 def code_lint(language: str, code: str) -> str:
-    """Lint and format code snippets."""
-    if language.lower() != 'python':
-        return "Only Python supported currently."
+    """Lint and format code snippets for multiple languages."""
+    lang = language.lower()
     try:
-        formatted = format_str(code, mode=FileMode(line_length=88))
+        if lang == 'python':
+            formatted = format_str(code, mode=FileMode(line_length=88))
+        elif lang == 'javascript':
+            opts = jsbeautifier.default_options()
+            formatted = jsbeautifier.beautify(code, opts)
+        elif lang == 'css':
+            opts = cssbeautifier.default_options()
+            formatted = cssbeautifier.beautify(code, opts)
+        elif lang == 'json':
+            formatted = json.dumps(json.loads(code), indent=4)
+        elif lang == 'yaml':
+            formatted = yaml.safe_dump(yaml.safe_load(code), indent=2)
+        elif lang == 'sql':
+            formatted = sqlparse.format(code, reindent=True, keyword_case='upper')
+        elif lang == 'xml':
+            dom = xml.dom.minidom.parseString(code)
+            formatted = dom.toprettyxml(indent="  ")
+        elif lang == 'html':
+            soup = BeautifulSoup(code, 'html.parser')
+            formatted = soup.prettify()
+        elif lang in ['c', 'cpp', 'c++']:
+            try:
+                formatted = subprocess.check_output(['clang-format', '-style=google'], input=code.encode()).decode()
+            except Exception as e:
+                return f"clang-format not available: {str(e)}"
+        elif lang == 'php':
+            try:
+                with tempfile.NamedTemporaryFile(suffix='.php', delete=False) as tmp:
+                    tmp.write(code.encode())
+                    tmp.flush()
+                    subprocess.check_call(['php-cs-fixer', 'fix', tmp.name, '--quiet'])
+                    with open(tmp.name, 'r') as f:
+                        formatted = f.read()
+                os.unlink(tmp.name)
+            except Exception as e:
+                return f"php-cs-fixer not available: {str(e)}"
+        elif lang == 'go':
+            try:
+                formatted = subprocess.check_output(['gofmt'], input=code.encode()).decode()
+            except Exception as e:
+                return f"gofmt not available: {str(e)}"
+        elif lang == 'rust':
+            try:
+                formatted = subprocess.check_output(['rustfmt', '--emit=stdout'], input=code.encode()).decode()
+            except Exception as e:
+                return f"rustfmt not available: {str(e)}"
+        else:
+            return "Unsupported language."
         return formatted
     except Exception as e:
         return f"Lint error: {str(e)}"
@@ -526,7 +578,7 @@ def langsearch_web_search(query: str, freshness: str = "noLimit", summary: bool 
     except Exception as e:
         return f"LangSearch error: {str(e)}"
 
-# Tool Schema for Structured Outputs - Unchanged
+# Tool Schema for Structured Outputs - Updated for code_lint
 TOOLS = [
     {
         "type": "function",
@@ -692,11 +744,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "code_lint",
-            "description": "Lint and auto-format code (Python with Black).",
+            "description": "Lint and auto-format code for languages: python (black), javascript (jsbeautifier), css (cssbeautifier), json, yaml, sql (sqlparse), xml, html (beautifulsoup), cpp/c++ (clang-format), php (php-cs-fixer), go (gofmt), rust (rustfmt). External tools required for some.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "language": {"type": "string", "description": "Language (python)."},
+                    "language": {"type": "string", "description": "Language (python, javascript, css, json, yaml, sql, xml, html, cpp, php, go, rust)."},
                     "code": {"type": "string", "description": "Code snippet."}
                 },
                 "required": ["language", "code"]
