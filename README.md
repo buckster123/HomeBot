@@ -138,8 +138,8 @@ Full step-by-step for **fresh Raspberry Pi 5** with **fresh Raspberry Pi OS** (6
 4. Eject SD, insert into Pi-5, boot up.
 5. Complete setup wizard: Set locale, user (e.g., `pi`), password, WiFi.
 
-### Step 2 A: Run install.sh 
-
+### Step 2 A: Automatic Installation
+ - Run install.sh 
 ### Step 2 B: Update System & Install Python
 
 SSH in or use terminal:
