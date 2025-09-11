@@ -3,8 +3,7 @@
 ![HomeBot Logo](https://github.com/buckster123/HomeBot/blob/main/logo.png)  
 [![Python Version](https://img.shields.io/badge/python-3.12-blue?logo=python)](https://www.python.org/downloads/release/python-3120/)  
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
-[![GitHub Repo stars](https://img.shields.io/github/stars/yourusername/homebot?style=social)](https://github.com/yourusername/homebot)  
-[![Discord](https://img.shields.io/discord/your-discord-id?color=7289DA&logo=discord&logoColor=white&label=Join%20Community)](https://discord.gg/your-invite)  
+[![GitHub Repo stars](https://img.shields.io/github/stars/buckster123/HomeBot?style=social)](https://github.com/buckster123/HomeBot)  
 [![Made with xAI](https://img.shields.io/badge/Powered%20by-xAI%20Grok-orange?logo=ai&logoColor=white)](https://x.ai/)  
 
 **HomeBot** is a self-hosted, agentic AI assistant platform built for Raspberry Pi 5 (Pi-5), leveraging xAI's Grok models via Streamlit. It's designed as a local, sandboxed AI agent hub for home automation, coding experiments, research, and personal productivity. Think of it as your personal JARVIS, but running on a credit-card-sized computer with brain-inspired memory (EAMS: Episodic-Advanced Memory System), tool integrations for file ops, Git, DB queries, code linting/execution, and web search—all while emphasizing safety, persistence, and nerd-level customizability.
