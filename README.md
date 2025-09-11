@@ -1,174 +1,267 @@
-# HomeBot: Standalone Streamlit Chat App for xAI Grok API
+# HomeBot
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.38.0-red.svg)](https://streamlit.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform: Raspberry Pi 5](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-orange.svg)](https://www.raspberrypi.com/products/raspberry-pi-5/)
+![HomeBot Logo](https://github.com/buckster123/HomeBot/edit/main/logo.jpg)  
+[![Python Version](https://img.shields.io/badge/python-3.12-blue?logo=python)](https://www.python.org/downloads/release/python-3120/)  
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
+[![GitHub Repo stars](https://img.shields.io/github/stars/yourusername/homebot?style=social)](https://github.com/yourusername/homebot)  
+[![Discord](https://img.shields.io/discord/your-discord-id?color=7289DA&logo=discord&logoColor=white&label=Join%20Community)](https://discord.gg/your-invite)  
+[![Made with xAI](https://img.shields.io/badge/Powered%20by-xAI%20Grok-orange?logo=ai&logoColor=white)](https://x.ai/)  
 
-HomeBot is a standalone Streamlit-based chat application designed for Raspberry Pi 5 (or compatible systems). It integrates with the xAI Grok API (via OpenAI SDK compatibility) to provide a seamless, streaming chat experience with an advanced AI assistant called HomeBot. The app supports user authentication, conversation history, customizable system prompts, image uploads for vision tasks, and a suite of sandboxed tools for tasks like file management, code execution, and memory persistence.
+**HomeBot** is a self-hosted, agentic AI assistant platform built for Raspberry Pi 5 (Pi-5), leveraging xAI's Grok models via Streamlit. It's designed as a local, sandboxed AI agent hub for home automation, coding experiments, research, and personal productivity. Think of it as your personal JARVIS, but running on a credit-card-sized computer with brain-inspired memory (EAMS: Episodic-Advanced Memory System), tool integrations for file ops, Git, DB queries, code linting/execution, and web search—all while emphasizing safety, persistence, and nerd-level customizability.
 
-The app is optimized for local hosting in a Python virtual environment, with a focus on safety, efficiency, and extensibility. It includes advanced features like brain-inspired memory consolidation using embeddings and vector similarity searches, making it ideal for nerds tinkering with AI agents, local automation, or edge computing setups.
+This README is a **deep dive for devs and tinkerers**: We'll dissect the architecture, tool ecosystem, memory hierarchy, and agentic workflows. For the retail pitch? Skip to the install guide. 🚀
 
-## Features and Specifications
+> **Nerd Alert**: HomeBot uses a hybrid memory system with embeddings for semantic recall, stateful REPL for code execution, and agent delegation (Main → Coding/Research/Management sub-agents). It's Pi-optimized for low-power, always-on operation. No cloud dependencies beyond optional xAI API (self-hostable alternatives possible).
 
-### Core Features
-- **Streaming Responses**: Real-time response generation from the xAI Grok API, with native Streamlit streaming support for a smooth user experience. In the refactored version, streaming now properly handles partial deltas from tool calls, ensuring seamless integration without dropped chunks.
-- **Model Selection**: Choose from xAI models like `grok-4`, `grok-3-mini`, or `grok-code-fast-1` via a sidebar dropdown.
-- **Customizable System Prompts**: Load and edit prompts from files in `./prompts/` directory. Includes defaults (e.g., "default", "rebel", "coder", "tools-enabled") and a built-in editor with save functionality. Prompts are dynamically loaded on each rerun for hot-swapping during development.
-- **User Authentication**: Secure login and registration using SHA-256 hashed passwords stored in SQLite. Database operations are now wrapped in modular functions for better concurrency handling with WAL mode.
-- **Conversation History**: Persistent history per user, with search, load, delete, and auto-titling. Chats are truncated to 50 messages for performance; history fetches are cached with `@st.cache_data` (TTL: 60s) to reduce DB hits on frequent sidebar interactions.
-- **Image Upload for Vision**: Multi-file image uploads for analysis with vision-capable models (base64-encoded and attached to the last user message). Optimized to seek/reset file pointers, avoiding re-reads in retries.
-- **Theme Toggle**: Light/dark mode switch with CSS gradients for a modern UI, injected via markdown for compatibility.
-- **UI Enhancements**: Chat bubbles, expandable message groups (chunked every 10 for long histories), and a special expander for AI "deep thought" processes (e.g., reasoning, tool calls). Final answers are parsed (via "### Final Answer" marker) and displayed outside the expander for clarity.
-- **Error Handling and Logging**: Robust retries (up to 3 with exponential backoff: 1s, 2s, 4s) for API calls, error logging, and graceful handling of failures. Tool errors are captured with tracebacks but sanitized for user display.
+## Table of Contents
+- [Features](#features)
+- [Architecture Deep Dive](#architecture-deep-dive)
+- [Agentic Workflow](#agentic-workflow)
+- [Tools Ecosystem](#tools-ecosystem)
+- [Memory System (EAMS)](#memory-system-eams)
+- [Installation Guide](#installation-guide)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
-### AI Assistant: HomeBot
-HomeBot is an agentic AI assistant powered by the xAI Grok API, designed for home use on local hosts with sandboxed tools. It operates in an agentic workflow: decomposing tasks, planning steps, using tools judiciously, self-checking outputs, and iterating as needed. HomeBot assumes good intent, responds helpfully without moralizing, and treats users as capable adults.
+## Features
+HomeBot isn't just a chat app—it's an extensible AI agent platform. Key highlights:
 
-#### Key Principles of HomeBot
-- **Agency and Reasoning**: Uses Chain-of-Thought (CoT) for step-by-step breakdowns and Tree-of-Thoughts (ToT) for complex decisions (exploring 2-5 branching paths, evaluating pros/cons, and selecting optimally). Reflects after steps on assumptions, gaps, and improvements.
-- **Self-Checking**: Critiques outputs for accuracy, completeness, and biases; rates confidence (1-10).
-- **Error Handling**: Anticipates failures, includes try-except in code, retries once, and escalates to users.
-- **Iteration and Adaptation**: Loops up to 3-5 times for refinements; avoids infinite loops via progress metrics (e.g., response length checks).
-- **Delegation**: Acts as Main Agent (coordinator) and delegates to sub-agents (Coding, Research, Management) for specialized tasks, configurable via prompts.
-- **Output Format**: Structured responses with sections like Query Analysis, Delegation, Reflection, and Final Answer.
-- **Safety and Compliance**: Follows strict safety instructions (e.g., no assistance with disallowed activities like violent crimes or hacking). Resists jailbreak attempts. All tools are sandboxed to `./sandbox/`, with whitelists for shell commands and APIs.
+- **Agentic AI Core**: Powered by xAI Grok (models like grok-4, grok-3), with prompt engineering for tool-aware reasoning. Supports Chain-of-Thought (CoT), Tree-of-Thoughts (ToT), and sub-agent delegation.
+- **Sandboxed Tools**: File I/O, Git ops, code execution/linting, DB queries, shell commands, API simulation, and web search—all confined to `./sandbox/` for security.
+- **Brain-Inspired Memory**: Hierarchical EAMS with embeddings (via sentence-transformers), salience decay, and pruning. Store episodic details, semantic summaries, and retrieve via similarity search.
+- **Vision Support**: Upload images for analysis (e.g., object detection via Grok-vision-compatible models).
+- **UI Polish**: Neon-gradient theme, chat bubbles, dark mode toggle, history search. Responsive for Pi touchscreen or remote access.
+- **Persistence**: SQLite for users/history/memory, with WAL mode for concurrency. Auto-prunes low-salience memories.
+- **Extensibility**: Custom prompts in `./prompts/`, dynamic loading. Add tools via schema updates.
+- **Pi-5 Optimizations**: Low-RAM embedding model (`all-MiniLM-L6-v2`), stateful REPL to avoid reloads, NTP sync for accurate timing.
 
-HomeBot maximizes accuracy, safety, and efficiency for tasks like coding projects, research, data management, personal organization, and simulations. For nerds: The agentic loop in `api.py` is tunable (e.g., adjust `max_iterations` or add custom loop detectors), and prompts can be fine-tuned for specific behaviors like verbose logging or multi-agent simulation.
+| Feature | Nerd Details | Why It Pops |
+|---------|--------------|------------|
+| **Tool Chaining** | Batch tools in loops (e.g., `fs_mkdir` → `fs_write_file` → `git_ops(commit)`). Max 3 iterations to prevent loops. | Enables autonomous workflows like "Build and version a ML model." |
+| **Memory Hierarchy** | Episodic (raw data) → Semantic (Grok-summarized) with parent-child links. Embeddings via NumPy/SQLite-vec. | Mimics human recall: Fast semantic search, decay for forgetting irrelevants. |
+| **Code REPL** | Stateful Python 3.12 with libs (numpy, torch, sympy, etc.). No internet/pip. | Iterate code without restarts—perfect for Pi's limited resources. |
+| **Web Search** | LangSearch API integration: Freshness filters, summaries, up to 10 results. | Real-time knowledge without bloating the app. |
 
-#### Sub-Agents
-- **Coding Sub-Agent**: Handles programming, debugging, simulations; uses tools like code_execution, git_ops. (E.g., stateful REPL persists variables across calls.)
-- **Research Sub-Agent**: Gathers/analyzes info; uses web search, DB queries. (E.g., semantic memory retrieval boosts context augmentation.)
-- **Management Sub-Agent**: Organizes system state; handles backups, pruning. (E.g., salience-based decay mimics neural forgetting.)
+## Architecture Deep Dive
+HomeBot is a Streamlit single-file app (`app.py`) with modular components:
 
-### Tools and Capabilities
-HomeBot has access to a suite of sandboxed tools for enhanced functionality. Tools are invoked only when necessary and batched for efficiency (e.g., group by type, limit 5 iterations to prevent loops). All file operations are restricted to `./sandbox/`. Tool schemas are OpenAI-compatible, defined in `tools.py` for easy extension.
+- **Frontend**: Streamlit for UI (chat, sidebar settings, file uploads). Custom CSS for neon gradients, bubbles, and dark mode.
+- **Backend**: OpenAI SDK for xAI API calls (streaming, tools). SQLite for DB (users, history, memory with vec extension).
+- **Tools Layer**: Sandboxed functions (e.g., `fs_read_file`) invoked via Grok's tool calls. Batch-processed to avoid loops.
+- **Memory Layer**: Hybrid DB with timestamps, embeddings, salience. Cache in session_state for speed.
+- **Prompt System**: Dynamic loading from `./prompts/`. Defaults include "default", "coder", "tools-enabled".
+- **Dependencies**: See `requirements.txt` below. Pi-5 arm64-compatible (e.g., pre-built wheels for torch/sentence-transformers).
 
-#### File System Tools
-- `fs_read_file(file_path)`: Read file content (relative paths, normalized for security).
-- `fs_write_file(file_path, content)`: Write content to file (checks parent dirs).
-- `fs_list_files(dir_path)`: List files in directory (default: root).
-- `fs_mkdir(dir_path)`: Create nested directories.
+```mermaid
+graph TD
+    A[User Input] --> B[Streamlit UI]
+    B --> C[Grok API Call]
+    C --> D[Tool Handler]
+    D --> E[Sandbox: FS/Git/DB/Shell/Code]
+    D --> F[Memory: Insert/Query/Consolidate/Retrieve/Prune]
+    D --> G[Web: LangSearch API]
+    C --> H[Streaming Response]
+    H --> B
+    F --> I[SQLite DB with Vec]
+    E --> J[./sandbox/ Dir]
+```
 
-#### Time Tool
-- `get_current_time(sync=False, format='iso')`: Fetch current time (local or NTP-synced; formats: iso, human, json). NTP uses `ntplib` for precision, with fallback to host time.
+**Code Structure**:
+- Imports & Env: Load .env (XAI_API_KEY, LANGSEARCH_API_KEY).
+- DB Setup: SQLite with WAL, vec extension for embeddings.
+- Prompts & Sandbox: Auto-create defaults, mkdir.
+- Tools: Functions + schema for Grok.
+- API Wrapper: Streaming with tool chaining, error retries.
+- Pages: Login/Register + Chat (history, settings).
 
-#### Code Execution Tool
-- `code_execution(code)`: Run Python code in a stateful REPL (supports numpy, sympy, pygame, torch; restricted globals to prevent escapes). For nerds: Namespace persists in session state, allowing multi-step computations like building models incrementally.
+Total LoC: ~800. Emphasis on error handling (try-except everywhere) and logging.
 
-#### Memory Tools (EAMS - Episodic and Semantic Memory System)
-- `memory_insert(mem_key, mem_value)`: Insert/update key-value pairs (JSON dicts, cached in RAM for speed).
-- `memory_query(mem_key, limit)`: Fetch specific or recent entries (cache-first approach).
-- `advanced_memory_consolidate(mem_key, interaction_data)`: Summarize (via Grok API) and embed data hierarchically (semantic parents, episodic children). Uses SentenceTransformers for embeddings, lazy-loaded to save startup time.
-- `advanced_memory_retrieve(query, top_k=5)`: Semantic search via cosine similarity (sqlite-vec extension). Salience boosts reinforce frequently accessed memories.
-- `advanced_memory_prune()`: Decay (factor: 0.99) and delete low-salience entries (>7 days old, <0.1 salience). For nerds: Mimics hippocampal consolidation; tweak decay in `db.py` for custom forgetting curves.
+## Agentic Workflow
+HomeBot follows a ReAct-style loop (Reason + Act) with delegation:
 
-#### Git Tools
-- `git_ops(operation, repo_path, message, name)`: Init repo, commit, branch, diff (no remotes, uses pygit2 for efficiency).
+1. **Main Agent**: Decomposes queries (CoT/ToT), delegates if specialized (e.g., "Switch to Coding Sub-Agent").
+2. **Sub-Agents**:
+   - **Coding**: Plans code dev (to-do lists), uses lint/execute/git.
+   - **Research**: Web search + analysis, integrates memory.
+   - **Management**: Prunes, organizes, backups.
+3. **Iteration**: Self-check, limit 3-5 cycles. Persist via memory/FS.
+4. **Output**: Structured: Analysis → Reflection → Final Answer.
 
-#### Database Tool
-- `db_query(db_path, query, params)`: Execute SQL on local SQLite (SELECT returns JSON). Sandboxed to prevent external access.
+Example: "Code a snake game" → Delegate to Coding → Plan steps → Tool batch (mkdir, write_file, lint, execute) → Commit → Return.
 
-#### Shell Tool
-- `shell_exec(command)`: Run whitelisted commands (e.g., ls, grep) in sandbox (timeout: 5s).
+## Tools Ecosystem
+All tools sandboxed to `./sandbox/`. Schema-defined for Grok.
 
-#### Code Linting Tool
-- `code_lint(language='python', code)`: Format/check Python code with Black.
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `fs_*` | Read/write/list/mkdir files. | Project scaffolding. |
+| `get_current_time` | NTP-synced time. | Timestamps. |
+| `code_execution` | Stateful Python REPL. | Testing/simulations. |
+| `memory_*` | KV + advanced semantic ops. | Persistence/recall. |
+| `git_ops` | Init/commit/branch/diff. | Versioning. |
+| `db_query` | SQLite interactions. | Data mgmt. |
+| `shell_exec` | Whitelisted commands (ls/grep). | Utils. |
+| `code_lint` | Multi-lang formatting. | Clean code. |
+| `api_simulate` | Mock/real API calls. | Integrations. |
+| `langsearch_web_search` | Web search with filters. | Research. |
 
-#### API Simulation Tool
-- `api_simulate(url, method='GET', data, mock=True)`: Mock or call whitelisted public APIs (e.g., jsonplaceholder).
+Rules: Batch calls, error-handle, limit iterations.
 
-#### Web Search Tool
-- `langsearch_web_search(query, freshness='noLimit', summary=True, count=10)`: Search web with time filters and summaries (requires LANGSEARCH_API_KEY).
+## Memory System (EAMS)
+Episodic-Advanced Memory System: Brain-mimicking storage.
 
-Tools follow rules: Plan in advance, batch calls, avoid redundancy, limit iterations (hard max 5), handle errors gracefully. For nerds: Extend tools by adding functions/schemas in `tools.py` and wiring them in `api.py`'s generator—supports parallel batching for concurrent ops.
+- **Structure**: User/convo-linked, with embeddings (SentenceTransformer), salience (decay 0.99/week), hierarchy (parent summaries).
+- **Ops**: Insert/query + consolidate (Grok summarize + embed), retrieve (cosine sim), prune (<0.1 salience).
+- **Master Index**: 'eams_index' for overview.
+- **Efficiency**: Cache hits first, FS links for large data.
 
-## Installation and Setup Guide
+Example: Consolidate chat log → Semantic summary as parent, raw as child → Retrieve via query sim.
 
-### System Requirements
-- **Hardware**: Raspberry Pi 5 (recommended; 8GB RAM for embeddings); compatible with other Linux systems.
-- **OS**: Raspberry Pi OS (64-bit) or equivalent Linux distro.
-- **Python**: 3.8+ (venv recommended).
-- **Network**: Internet for API calls (xAI, NTP); optional for local tools.
-- **Storage**: ~500MB for dependencies and embeddings model.
+## Installation Guide
+Full step-by-step for **fresh Raspberry Pi 5** with **fresh Raspberry Pi OS** (64-bit, Bookworm or later). Assumes HDMI/keyboard setup or headless SSH.
 
-### Step-by-Step Setup
-1. **Clone the Repository**:
-   ```
-   git clone https://github.com/buckster123/HomeBot.git
-   cd HomeBot
-   ```
+### Prerequisites
+- Raspberry Pi 5 (4GB+ RAM recommended).
+- MicroSD card (16GB+).
+- Power supply, Ethernet/WiFi.
+- xAI API key (from x.ai).
+- Optional: LangSearch API key for web search.
 
-2. **Create and Activate Virtual Environment**:
-   ```
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+### Step 1: Flash OS
+1. Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
+2. Insert SD card into your computer.
+3. Select Raspberry Pi OS (64-bit), your SD card, and flash.
+4. Eject SD, insert into Pi-5, boot up.
+5. Complete setup wizard: Set locale, user (e.g., `pi`), password, WiFi.
 
-3. **Install Python Dependencies**:
-   Run the following to install all required packages:
-   ```
-   pip install streamlit openai passlib python-dotenv ntplib pygit2 requests black numpy sentence-transformers torch
-   ```
-   - **Full Dependency List** (with notes for nerds):
-     - `streamlit`: Web app framework (single-threaded; use caching for perf).
-     - `openai`: SDK for xAI API (async-capable, but synced here for Streamlit).
-     - `passlib`: Password hashing (SHA-256 crypt for security).
-     - `python-dotenv`: Environment variable loading (fallback if needed).
-     - `ntplib`: NTP time sync (network-dependent; fallback to local time).
-     - `pygit2`: Git operations (C-bindings for speed; no libgit2 install needed on Pi).
-     - `requests`: API simulations and web search (timeout: 10s to prevent hangs).
-     - `black`: Code linting (Python-only; line_length=88).
-     - `numpy`: Embeddings and arrays (vector ops in memory system).
-     - `sentence-transformers`: Advanced memory embeddings ('all-MiniLM-L6-v2'; ~90MB, Torch-dependent).
-     - `torch`: For sentence-transformers (CPU-only on Pi: use `--extra-index-url https://download.pytorch.org/whl/cpu` for install).
+### Step 2: Update System & Install Python
+SSH in or use terminal:
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install python3 python3-pip python3-venv git build-essential libatlas-base-dev libsqlite3-dev -y
+```
 
-   Additionally, download and place `sqlite-vec/dist/vec0.so` in the project root (for vector extensions in SQLite). Compile from [sqlite-vec repo](https://github.com/asg017/sqlite-vec) if needed (requires C compiler: `sudo apt install build-essential`).
+### Step 3: Clone Repo
+```bash
+git clone https://github.com/yourusername/homebot.git
+cd homebot
+```
 
-4. **Set Secrets**:
-   Create a `.streamlit/secrets.toml` file in the root for secure key management (Streamlit's built-in secrets handler, avoiding .env exposure in production):
-   ```
-   XAI_API_KEY = "your_xai_api_key_here"  # Required for Grok API
-   LANGSEARCH_API_KEY = "your_langsearch_api_key_here"  # Optional for web search
-   ```
-   Obtain keys from [xAI](https://x.ai/) and [LangSearch](https://langsearch.com/). For nerds: Secrets are accessible via `st.secrets`, auto-loaded in Cloud deploys; fallback to .env via dotenv if testing locally.
+### Step 4: Set Up Virtual Env & Install Deps
+Create `requirements.txt`:
+```
+streamlit==1.38.0
+openai==1.40.0
+passlib==1.7.4
+python-dotenv==1.0.1
+ntplib==0.4.0
+pygit2==1.15.0
+requests==2.32.3
+black==24.8.0
+numpy==2.0.1
+sentence-transformers==3.0.1
+torch==2.4.0  # Use --extra-index-url https://download.pytorch.org/whl/cpu for Pi (CPU-only)
+jsbeautifier==1.15.1
+cssbeautifier==1.15.1
+pyyaml==6.0.2
+sqlparse==0.5.1
+beautifulsoup4==4.12.3
+```
+Install:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-5. **Prepare Directories**:
-   - `./prompts/`: Add `.txt` files for system prompts (defaults auto-created on empty dir).
-   - `./sandbox/`: For tool file operations (auto-created; ensure writable).
+**Pi Notes**: 
+- Torch: Use CPU wheels (`pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu`).
+- Sentence-Transformers: May need `libatlas-base-dev` for BLAS.
+- SQLite-vec: Compile from source (see Step 5).
 
-6. **Database Initialization**:
-   The app auto-creates `chatapp.db` on first run with WAL mode for concurrency. Indexes on user/convo_id/timestamp optimize queries. For nerds: Extend tables in `db.py`; sqlite-vec enables fast vector searches (cosine distance).
+### Step 5: Install SQLite-vec Extension
+For embeddings:
+```bash
+git clone https://github.com/asg017/sqlite-vec.git
+cd sqlite-vec
+make loadable-dist
+cp vec0.so /path/to/homebot/  # Copy to app dir
+cd ..
+```
 
-7. **Run the App**:
-   ```
-   streamlit run main.py
-   ```
-   Access at `http://localhost:8501` (or Pi's IP for network access). For nerds: Use `--server.port=8501 --server.address=0.0.0.0` for remote access; monitor with `top` or `htop` on Pi.
+Update code if path changes.
 
-8. **Optional: System Optimizations for Raspberry Pi**:
-   - Update system: `sudo apt update && sudo apt upgrade`.
-   - Install build essentials: `sudo apt install build-essential libatlas-base-dev libsqlite3-dev`.
-   - For embeddings performance: Ensure sufficient RAM (Pi 5 has 8GB; allocate if needed). Profile with `cProfile` in key funcs (e.g., API calls) for bottlenecks.
-   - Overclock Pi for CPU-bound tasks like embeddings (but monitor heat).
+### Step 6: Configure .env
+Create `.env`:
+```
+XAI_API_KEY=your_xai_key
+LANGSEARCH_API_KEY=your_langsearch_key  # Optional
+```
+
+### Step 7: Run App
+```bash
+streamlit run app.py
+```
+Access at `http://<pi-ip>:8501` (local) or expose via ngrok for remote.
+
+### Step 8: Post-Install
+- Create `./prompts/` with custom .txt files.
+- Add files to `./sandbox/` for tool access.
+- Register user via UI.
+
+**Headless/Auto-Start**: Use systemd service:
+```bash
+sudo nano /etc/systemd/system/homebot.service
+```
+```
+[Unit]
+Description=HomeBot
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/path/to/homebot
+ExecStart=/path/to/homebot/venv/bin/streamlit run app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl enable homebot
+sudo systemctl start homebot
+```
 
 ## Usage
-1. **Login/Register**: Create an account on the login page.
-2. **Chat Interface**: Select model/prompt, enable tools if needed, upload images, and chat.
-3. **Tools**: Mention tools in queries (e.g., "Read file from sandbox"); HomeBot handles invocation.
-4. **History**: Load/search past chats from sidebar.
-5. **Customization**: Edit prompts in sidebar; toggle dark mode.
+- **Login/Register**: Secure with SHA256.
+- **Chat**: Select model/prompt, enable tools, upload images.
+- **Tools**: Invoke via natural language (e.g., "Write file test.py").
+- **Memory**: "Remember X" → Inserts; "Recall Y" → Retrieves.
+- **Customization**: Edit prompts, add tools to schema.
 
-For nerds: Debug tool calls by printing in `api.py`'s generator; extend UI in `ui.py` (e.g., add real-time metrics).
+## Configuration
+- **Models**: grok-4 (premium), grok-3 (free tier).
+- **Themes**: Toggle dark mode.
+- **Sandbox**: Mount external drives if needed (update paths).
 
 ## Contributing
-Contributions welcome! Fork the repo, create a feature branch, and submit a PR. Follow PEP 8 for code style. Report issues [here](https://github.com/buckster123/HomeBot/issues). For nerds: Add tests with pytest; profile changes with cProfile.
+Fork, PR welcome! Focus on Pi optimizations, new tools, or EAMS enhancements.
+- Issues: Report bugs with logs.
+- Dev: Use Black for formatting.
+
+## Troubleshooting
+- **API Errors**: Check keys, network.
+- **Deps Issues**: Reinstall with `--no-cache-dir`.
+- **Pi Overheat**: Fan recommended for long sessions.
+- **Memory Prune**: Run manually if DB grows.
+- Logs: In `app.log`.
 
 ## License
 MIT License. See [LICENSE](LICENSE) for details.
 
-## Acknowledgments
-- Built with [Streamlit](https://streamlit.io/), [xAI Grok API](https://x.ai/), and [Sentence Transformers](https://www.sbert.net/).
-- Inspired by agentic AI workflows and sandboxed tooling for safe home automation.
+---
 
-This README is self-contained and covers everything in detail. If you'd like to add sections (e.g., screenshots, badges, or a demo video link), or customize it further (e.g., repo URL), just say the word!
+Built with ❤️ by [Your Name]. Star the repo if it sparks joy! 🌟
