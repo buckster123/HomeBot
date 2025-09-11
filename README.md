@@ -148,7 +148,7 @@ sudo apt install python3 python3-pip python3-venv git build-essential libatlas-b
 ### Step 3: Clone Repo
 ```bash
 git clone https://github.com/buckster123/HomeBot.git
-cd homebot
+cd HomeBot
 ```
 
 ### Step 4: Set Up Virtual Env & Install Deps
