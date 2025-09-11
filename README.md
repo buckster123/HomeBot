@@ -139,7 +139,7 @@ Full step-by-step for **fresh Raspberry Pi 5** with **fresh Raspberry Pi OS** (6
 5. Complete setup wizard: Set locale, user (e.g., `pi`), password, WiFi.
 
 ### Step 2 A: Automatic Installation
- - Run install.sh and proceed to # Step 7
+ - Run install.sh and proceed to Step 7
 
 ### Or...
 
