@@ -1,16 +1,6 @@
 #!/bin/bash
 
-# This script performs a fresh installation of HomeBot on Raspberry Pi OS (64-bit, Bookworm or later).
-# It assumes you're running it on a booted Raspberry Pi (headless or desktop).
-# You'll be prompted for your API keys during installation.
-# After installation, you can run the app with: cd HomeBot && source venv/bin/activate && streamlit run app.py
-# For auto-start (headless), see the README for systemd setup.
-# Pi Notes:
-# - Torch: Installed with CPU wheels using --extra-index-url https://download.pytorch.org/whl/cpu.
-# - Sentence-Transformers: Requires libatlas-base-dev for BLAS (installed via apt).
-# - SQLite-vec: Compiled from source and copied to the app directory for embeddings support.
-
-set -e  # Exit on error
+set -e  
 
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
