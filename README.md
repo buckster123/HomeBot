@@ -138,7 +138,10 @@ Full step-by-step for **fresh Raspberry Pi 5** with **fresh Raspberry Pi OS** (6
 4. Eject SD, insert into Pi-5, boot up.
 5. Complete setup wizard: Set locale, user (e.g., `pi`), password, WiFi.
 
-### Step 2: Update System & Install Python
+### Step 2 A: Run install.sh 
+
+### Step 2 B: Update System & Install Python
+
 SSH in or use terminal:
 ```bash
 sudo apt update && sudo apt upgrade -y
@@ -225,7 +228,7 @@ After=network.target
 [Service]
 User=pi
 WorkingDirectory=/path/to/homebot
-ExecStart=/path/to/homebot/venv/bin/streamlit run app.py
+ExecStart=/path/to/HomeBot/venv/bin/streamlit run app.py
 Restart=always
 
 [Install]
