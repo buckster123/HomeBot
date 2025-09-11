@@ -271,4 +271,4 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-Built with ❤️ by André. Star the repo if it sparks joy! Agents for everyone! 🌟
+Built with ❤️ by André. Star the repo if it sparks joy! Agents for everyone! ❤️
