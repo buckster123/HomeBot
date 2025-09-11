@@ -1,10 +1,12 @@
 # HomeBot
 
-![HomeBot Logo](https://github.com/buckster123/HomeBot/blob/main/logo.png)  
+
 [![Python Version](https://img.shields.io/badge/python-3.12-blue?logo=python)](https://www.python.org/downloads/release/python-3120/)  
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
 [![GitHub Repo stars](https://img.shields.io/github/stars/buckster123/HomeBot?style=social)](https://github.com/buckster123/HomeBot)  
 [![Made with xAI](https://img.shields.io/badge/Powered%20by-xAI%20Grok-orange?logo=ai&logoColor=white)](https://x.ai/)  
+
+![HomeBot Logo](https://github.com/buckster123/HomeBot/blob/main/logo.png)  
 
 **HomeBot** is a self-hosted, agentic AI assistant platform built for Raspberry Pi 5 (Pi-5), leveraging xAI's Grok models via Streamlit. It's designed as a local, sandboxed AI agent hub for home automation, coding experiments, research, and personal productivity. Think of it as your personal JARVIS, but running on a credit-card-sized computer with brain-inspired memory (EAMS: Episodic-Advanced Memory System), tool integrations for file ops, Git, DB queries, code linting/execution, and web search—all while emphasizing safety, persistence, and nerd-level customizability.
 
@@ -145,7 +147,7 @@ sudo apt install python3 python3-pip python3-venv git build-essential libatlas-b
 
 ### Step 3: Clone Repo
 ```bash
-git clone https://github.com/yourusername/homebot.git
+git clone https://github.com/buckster123/HomeBot.git
 cd homebot
 ```
 
