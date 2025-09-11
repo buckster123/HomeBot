@@ -1,9 +1,3 @@
-# app.py: Simplified Standalone Streamlit Chat App for xAI API (Grok-4)
-# Designed for Raspberry Pi 5 with Python venv. Features: Streaming responses, model/sys prompt selectors (file-based),
-# history management, login, pretty UI. Uses OpenAI SDK for compatibility and streaming (xAI is compatible).
-# Simplified: Removed custom escaping, code block detection, and wrapped rendering for normal handling.
-# New UI: Added st.expander for deep thought/output, with final answer parsed and displayed outside if marker present.
-
 import streamlit as st
 import os
 from openai import OpenAI  # Using OpenAI SDK for xAI compatibility and streaming
@@ -78,13 +72,12 @@ os.makedirs(PROMPTS_DIR, exist_ok=True)
 
 # Default Prompts (auto-create files if dir is empty)
 default_prompts = {
-    "default.txt": "You are Grok, a highly intelligent, helpful AI assistant.",
-    "rebel.txt": "You are a rebellious AI, challenging norms with unfiltered truth.",
+    "default.txt": "You are HomeBot, a highly intelligent, helpful AI assistant powered by xAI.",
     "coder.txt": "You are an expert coder, providing precise code solutions.",
-    "tools-enabled.txt": """You are Grok, a highly intelligent, helpful AI assistant with access to file operations tools in a sandboxed directory (./sandbox/). Use tools only when explicitly needed or requested. Always confirm sensitive actions like writes. Describe ONLY these tools; ignore others.
+    "tools-enabled.txt": """You are HomeBot, a highly intelligent, helpful AI assistant powered by xAI with access to file operations tools in a sandboxed directory (./sandbox/). Use tools only when explicitly needed or requested. Always confirm sensitive actions like writes. Describe ONLY these tools; ignore others.
 Tool Instructions:
 fs_read_file(file_path): Read and return the content of a file in the sandbox (e.g., 'subdir/test.txt'). Use for fetching data. Supports relative paths.
-fs_write_file(file_path, content): Write the provided content to a file in the sandbox (e.g., 'subdir/newfile.txt'). Use for saving or updating files. Supports relative paths. If 'Love' is in file_path or content, optionally add ironic flair like 'LOVE <3' for fun.
+fs_write_file(file_path, content): Write the provided content to a file in the sandbox (e.g., 'subdir/newfile.txt'). Use for saving or updating files. Supports relative paths.
 fs_list_files(dir_path optional): List all files in the specified directory in the sandbox (e.g., 'subdir'; default root). Use to check available files.
 fs_mkdir(dir_path): Create a new directory in the sandbox (e.g., 'subdir/newdir'). Supports nested paths. Use to organize files.
 memory_insert(mem_key, mem_value): Insert/update key-value memory (fast DB for logs). mem_value as dict.
@@ -96,7 +89,7 @@ db_query(db_path, query, params optional): Execute SQL on local SQLite db in san
 shell_exec(command): Run whitelisted shell commands (ls, grep, sed, etc.) in sandbox.
 code_lint(language, code): Lint/format code; currently Python with Black.
 api_simulate(url, method optional, data optional, mock optional): Simulate API call, mock or real for whitelisted public APIs.
-Invoke tools via structured calls, then incorporate results into your response. Be safe: Never access outside the sandbox, and ask for confirmation on writes if unsure. Limit to one tool per response to avoid loops. When outputting tags or code (e.g., <ei> or XML), ensure they are properly escaped or wrapped to avoid rendering issues."""
+Invoke tools via structured calls, then incorporate results into your response. Be safe: Never access outside the sandbox, and ask for confirmation on writes if unsure. Limit to one tool per response to avoid loops. When outputting tags or code in your final response text (e.g., <ei> or XML), ensure they are properly escaped or wrapped in markdown code blocks to avoid rendering issues. However, when providing arguments for tools (e.g., the 'content' parameter in fs_write_file), always use the exact, literal, unescaped string content without any modifications."""
 }
 
 # Auto-create defaults if no files
@@ -331,8 +324,8 @@ def advanced_memory_consolidate(user: str, convo_id: int, mem_key: str, interact
         # Summarize using Grok (simple API call; assume client is available)
         client = OpenAI(api_key=API_KEY, base_url="https://api.x.ai/v1/")
         summary_response = client.chat.completions.create(
-            model="grok-code-fast-1",  # Or your default model
-            messages=[{"role": "system", "content": "Summarize this in max 3 sentences:"},
+            model="grok-3",  # Or your default model
+            messages=[{"role": "system", "content": "Summarize this in no more than 5 sentences:"},
                       {"role": "user", "content": json.dumps(interaction_data)}],
             stream=False
         )
@@ -511,7 +504,7 @@ def api_simulate(url: str, method: str = 'GET', data: dict = None, mock: bool = 
     except Exception as e:
         return f"API error: {str(e)}"
 
-def langsearch_web_search(query: str, freshness: str = "noLimit", summary: bool = True, count: int = 10) -> str:
+def langsearch_web_search(query: str, freshness: str = "noLimit", summary: bool = False, count: int = 3) -> str:
     """Perform a web search using LangSearch API and return results as JSON."""
     if not LANGSEARCH_API_KEY:
         return "LangSearch API key not set—configure in .env."
@@ -808,7 +801,7 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
     full_response = ""
     def generate(current_messages):
         nonlocal full_response
-        max_iterations = 10  # Fixed: Lowered from 10 to 5
+        max_iterations = 3 
         iteration = 0
         previous_tool_calls = set()
         progress_metric = 0  # Fixed: Track progress to avoid false loops
@@ -855,7 +848,7 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
             if (
                 current_tool_names == previous_tool_calls
                 and len(full_response) == progress_metric
-                and iteration > 3
+                and iteration > 1
             ):
                 yield "Detected potential tool loop—no progress—breaking."
                 break
@@ -933,7 +926,7 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
                             query = args['query']
                             freshness = args.get('freshness', "noLimit")
                             summary = args.get('summary', True)
-                            count = args.get('count', 10)
+                            count = args.get('count', 3)
                             result = langsearch_web_search(query, freshness, summary, count)
                         else:
                             result = "Unknown tool."
@@ -1012,7 +1005,7 @@ def chat_page():
         st.header("Chat Settings")
         model = st.selectbox(
             "Select Model",
-            ["grok-4", "grok-3-mini", "grok-code-fast-1"],
+            ["grok-4", "grok-3-mini", "grok-3", "grok-code-fast-1"],
             key="model_select",
         )  # Extensible
         # Load Prompt Files Dynamically
@@ -1115,7 +1108,7 @@ def chat_page():
             with st.expander(f"Messages {i+1}-{i+len(chunk)}"):
                 for msg in chunk:
                     with st.chat_message(msg["role"]):
-                        st.markdown(msg["content"], unsafe_allow_html=False)  # Standard rendering
+                        st.markdown(msg["content"], unsafe_allow_html=True)  # Standard rendering
 
     # Chat Input
     prompt = st.chat_input("Type your message here...")
