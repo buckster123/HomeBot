@@ -27,7 +27,7 @@ This README is a **deep dive for devs and tinkerers**: We'll dissect the archite
 ## Features
 HomeBot isn't just a chat app—it's an extensible AI agent platform. Key highlights:
 
-- **Agentic AI Core**: Powered by xAI Grok-4, grok-code and grok-3-mini will work to some extent but best with grok-4, with prompt engineering for tool-aware reasoning. Enploys      Chain-of-Thought (CoT), Tree-of-Thoughts (ToT), and sub-agent delegation for complex tasks.
+- **Agentic AI Core**: Powered by xAI Grok-4, grok-code and grok-3-mini will work to some extent but it is best with grok-4, with prompt engineering for tool-aware reasoning. Enploys      Chain-of-Thought (CoT), Tree-of-Thoughts (ToT), and sub-agent delegation for complex tasks.
 - **Sandboxed Tools**: File I/O, Git ops, code execution/linting, DB queries, shell commands, API simulation, and web search—all confined to `./sandbox/` for security.
 - **Brain-Inspired Memory**: Hierarchical EAMS with embeddings (via sentence-transformers), salience decay, and pruning. Store episodic details, semantic summaries, and retrieve via similarity search.
 - **Vision Support**: Upload images for analysis (e.g., object detection via Grok-vision-compatible models).
