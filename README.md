@@ -207,7 +207,7 @@ LANGSEARCH_API_KEY=your_langsearch_key  # Optional
 
 ### Step 7: Run App
 ```bash
-streamlit run app.py
+streamlit run HomeBot-Rev1.1.py
 ```
 Access at `http://<pi-ip>:8501` (local) or expose via ngrok for remote.
 
