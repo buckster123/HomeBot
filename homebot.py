@@ -1,29 +1,31 @@
 import streamlit as st
 import os
-from openai import OpenAI  
+from openai import OpenAI  # Using OpenAI SDK for xAI compatibility and streaming
 from passlib.hash import sha256_crypt
 import sqlite3
 from dotenv import load_dotenv
 import json
 import time
-import base64  
-import traceback  
-import ntplib  
-import io 
-import sys 
-import pygit2 
-import subprocess
-import requests
-from black import format_str, FileMode
-import numpy as np
-from sentence_transformers import SentenceTransformer 
-from datetime import datetime, timedelta
-import jsbeautifier
-import yaml
-import sqlparse
-from bs4 import BeautifulSoup
-import xml.dom.minidom
-import tempfile
+import base64  # For image handling
+import traceback  # For error logging
+import ntplib  # For NTP time sync; pip install ntplib
+import io  # For capturing code output
+import sys  # For stdout redirection
+import pygit2  # For git_ops; pip install pygit2
+import subprocess  # Already imported, but explicit
+import requests  # For api_simulate; pip install requests
+from black import format_str, FileMode  # For code_lint; pip install black
+import numpy as np  # For embeddings
+from sentence_transformers import SentenceTransformer  # For advanced memory; pip install sentence-transformers torch
+from datetime import datetime, timedelta  # For pruning
+import jsbeautifier  # For JS/CSS linting; pip install jsbeautifier
+import yaml  # For YAML; pip install pyyaml
+import sqlparse  # For SQL; pip install sqlparse
+from bs4 import BeautifulSoup  # For HTML; pip install beautifulsoup4
+import xml.dom.minidom  # Built-in for XML
+import tempfile  # For temp files in linting
+import shlex  # For safe shell splitting
+import builtins  # For restricted globals
 
 # Load environment variables
 load_dotenv()
@@ -39,10 +41,18 @@ conn = sqlite3.connect('chatapp.db', check_same_thread=False)
 conn.execute("PRAGMA journal_mode=WAL;")
 conn.enable_load_extension(True)
 vec_path = os.path.join(os.path.dirname(__file__), 'sqlite-vec/dist/vec0.so')
-conn.load_extension(vec_path)
+vec_loaded = False
+try:
+    conn.load_extension(vec_path)
+    vec_loaded = True
+    st.session_state['vec_loaded'] = True
+except Exception as e:
+    st.warning(f"Vec extension unavailable ({e})—embeddings disabled.")
+    st.session_state['vec_loaded'] = False
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS history (user TEXT, convo_id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, messages TEXT)''')
+# NEW: Memory table for hybrid hierarchy (key-value with timestamp/index for fast queries)
 c.execute('''CREATE TABLE IF NOT EXISTS memory (
     user TEXT,
     convo_id INTEGER,  -- Links to history for per-session
@@ -52,10 +62,11 @@ c.execute('''CREATE TABLE IF NOT EXISTS memory (
     PRIMARY KEY (user, convo_id, mem_key)
 )''')
 c.execute('CREATE INDEX IF NOT EXISTS idx_memory_timestamp ON memory (timestamp)')  # For fast time-based queries
+# Add columns for advanced memory if not exist
 try:
     c.execute("ALTER TABLE memory ADD COLUMN embedding BLOB")
 except sqlite3.OperationalError:
-    pass 
+    pass  # Already exists
 try:
     c.execute("ALTER TABLE memory ADD COLUMN salience REAL DEFAULT 1.0")
 except sqlite3.OperationalError:
@@ -66,12 +77,26 @@ except sqlite3.OperationalError:
     pass
 conn.commit()
 
-if 'embed_model' not in st.session_state:
-    st.session_state['embed_model'] = SentenceTransformer('all-MiniLM-L6-v2')
+# Load embedding model lazily (only if advanced memory tools might be used)
+def load_embed_model():
+    if 'embed_model' not in st.session_state:
+        # Load only if advanced tools enabled or in prompt
+        enable_tools = st.session_state.get('enable_tools', False)
+        custom_prompt = st.session_state.get('custom_prompt', '')
+        if enable_tools and ('advanced_memory' in custom_prompt or 'embedding' in custom_prompt):
+            st.session_state['embed_model'] = SentenceTransformer('all-MiniLM-L6-v2')
+            st.info("Loaded embedding model for advanced memory.")
+        else:
+            st.session_state['embed_model'] = None
+            st.warning("Embedding model not loaded—enable advanced tools in prompt for vector search.")
 
+load_embed_model()  # Initial check
+
+# Prompts Directory (create if not exists, with defaults)
 PROMPTS_DIR = "./prompts"
 os.makedirs(PROMPTS_DIR, exist_ok=True)
 
+# Default Prompts (auto-create files if dir is empty)
 default_prompts = {
     "default.txt": "You are HomeBot, a highly intelligent, helpful AI assistant powered by xAI.",
     "coder.txt": "You are an expert coder, providing precise code solutions.",
@@ -93,17 +118,21 @@ api_simulate(url, method optional, data optional, mock optional): Simulate API c
 Invoke tools via structured calls, then incorporate results into your response. Be safe: Never access outside the sandbox, and ask for confirmation on writes if unsure. Limit to one tool per response to avoid loops. When outputting tags or code in your final response text (e.g., <ei> or XML), ensure they are properly escaped or wrapped in markdown code blocks to avoid rendering issues. However, when providing arguments for tools (e.g., the 'content' parameter in fs_write_file), always use the exact, literal, unescaped string content without any modifications."""
 }
 
+# Auto-create defaults if no files
 if not any(f.endswith('.txt') for f in os.listdir(PROMPTS_DIR)):
     for filename, content in default_prompts.items():
         with open(os.path.join(PROMPTS_DIR, filename), 'w') as f:
             f.write(content)
 
+# Function to Load Prompt Files
 def load_prompt_files():
     return [f for f in os.listdir(PROMPTS_DIR) if f.endswith('.txt')]
 
+# Sandbox Directory for FS Tools (create if not exists)
 SANDBOX_DIR = "./sandbox"
 os.makedirs(SANDBOX_DIR, exist_ok=True)
 
+# Custom CSS for Pretty UI (Neon Gradient Theme, Chat Bubbles, Responsive)
 st.markdown("""<style>
     body {
         background: linear-gradient(to right, #1f1c2c, #928DAB);
@@ -152,12 +181,37 @@ st.markdown("""<style>
 </style>
 """, unsafe_allow_html=True)
 
+# Helper: Hash Password
 def hash_password(password):
     return sha256_crypt.hash(password)
 
+# Helper: Verify Password
 def verify_password(stored, provided):
     return sha256_crypt.verify(provided, stored)
 
+# Tool Cache Helper
+def get_tool_cache_key(func_name, args):
+    return f"tool_cache:{func_name}:{hash(json.dumps(args, sort_keys=True))}"
+
+def get_cached_tool_result(func_name, args, ttl_minutes=5):
+    if 'tool_cache' not in st.session_state:
+        st.session_state['tool_cache'] = {}
+    cache = st.session_state['tool_cache']
+    key = get_tool_cache_key(func_name, args)
+    if key in cache:
+        timestamp, result = cache[key]
+        if (datetime.now() - timestamp).total_seconds() / 60 < ttl_minutes:
+            return result
+    return None
+
+def set_cached_tool_result(func_name, args, result):
+    if 'tool_cache' not in st.session_state:
+        st.session_state['tool_cache'] = {}
+    cache = st.session_state['tool_cache']
+    key = get_tool_cache_key(func_name, args)
+    cache[key] = (datetime.now(), result)
+
+# Tool Functions (Sandboxed) - Optimized with Cache
 def fs_read_file(file_path: str) -> str:
     """Read file content from sandbox (supports subdirectories)."""
     if not file_path:
@@ -169,14 +223,21 @@ def fs_read_file(file_path: str) -> str:
         return "File not found."
     if os.path.isdir(safe_path):
         return "Path is a directory, not a file."
+    cached = get_cached_tool_result('fs_read_file', {'file_path': file_path})
+    if cached:
+        return cached
     try:
         with open(safe_path, 'r') as f:
-            return f.read()
+            result = f.read()
+        set_cached_tool_result('fs_read_file', {'file_path': file_path}, result)
+        return result
     except Exception as e:
-        return f"Error reading file: {str(e)}"
+        result = f"Error reading file: {str(e)}"
+        set_cached_tool_result('fs_read_file', {'file_path': file_path}, result)
+        return result
 
 def fs_write_file(file_path: str, content: str) -> str:
-    """Write content to file in sandbox (supports subdirectories)."""
+    """Write content to file in sandbox (supports subdirectories). Cache invalidation on write."""
     if not file_path:
         return "Invalid file path."
     safe_path = os.path.abspath(os.path.normpath(os.path.join(SANDBOX_DIR, file_path)))
@@ -188,6 +249,11 @@ def fs_write_file(file_path: str, content: str) -> str:
     try:
         with open(safe_path, 'w') as f:
             f.write(content)
+        # Invalidate read cache for this file
+        if 'tool_cache' in st.session_state:
+            to_remove = [k for k in st.session_state['tool_cache'] if 'fs_read_file' in k and file_path in k]
+            for k in to_remove:
+                del st.session_state['tool_cache'][k]
         return f"File written successfully: {file_path}"
     except Exception as e:
         return f"Error writing file: {str(e)}"
@@ -201,11 +267,18 @@ def fs_list_files(dir_path: str = "") -> str:
         return "Directory not found."
     if not os.path.isdir(safe_dir):
         return "Path is not a directory."
+    cached = get_cached_tool_result('fs_list_files', {'dir_path': dir_path})
+    if cached:
+        return cached
     try:
         files = os.listdir(safe_dir)
-        return f"Files in {dir_path or 'root'}: {', '.join(files)}" if files else "No files in this directory."
+        result = f"Files in {dir_path or 'root'}: {', '.join(files)}" if files else "No files in this directory."
+        set_cached_tool_result('fs_list_files', {'dir_path': dir_path}, result)
+        return result
     except Exception as e:
-        return f"Error listing files: {str(e)}"
+        result = f"Error listing files: {str(e)}"
+        set_cached_tool_result('fs_list_files', {'dir_path': dir_path}, result)
+        return result
 
 def fs_mkdir(dir_path: str) -> str:
     """Create a new directory (including nested) in the sandbox."""
@@ -213,11 +286,17 @@ def fs_mkdir(dir_path: str) -> str:
         return "Invalid directory path."
     safe_path = os.path.abspath(os.path.normpath(os.path.join(SANDBOX_DIR, dir_path)))
     if not safe_path.startswith(os.path.abspath(SANDBOX_DIR)):
-        return "Invalid directory path."
+        return "Invalid file path."
     if os.path.exists(safe_path):
         return "Directory already exists."
     try:
         os.makedirs(safe_path)
+        # Invalidate list cache for parent dir
+        parent_dir = os.path.dirname(dir_path) or ""
+        if 'tool_cache' in st.session_state:
+            to_remove = [k for k in st.session_state['tool_cache'] if 'fs_list_files' in k and parent_dir in k]
+            for k in to_remove:
+                del st.session_state['tool_cache'][k]
         return f"Directory created successfully: {dir_path}"
     except Exception as e:
         return f"Error creating directory: {str(e)}"
@@ -247,10 +326,22 @@ def get_current_time(sync: bool = False, format: str = 'iso') -> str:
     except Exception as e:
         return f"Time error: {str(e)}"
 
+# Restricted builtins for safer exec
+SAFE_BUILTINS = [
+    'abs', 'all', 'any', 'bin', 'bool', 'chr', 'complex', 'dict', 'divmod', 'enumerate',
+    'float', 'format', 'frozenset', 'getattr', 'globals', 'hasattr', 'hash', 'hex',
+    'id', 'int', 'isinstance', 'issubclass', 'iter', 'len', 'list', 'locals', 'map',
+    'max', 'min', 'next', 'object', 'ord', 'pow', 'print', 'property', 'range', 'repr',
+    'reversed', 'round', 'set', 'setattr', 'slice', 'sorted', 'staticmethod', 'str',
+    'sum', 'super', 'tuple', 'type', 'vars', 'zip'
+]
+restricted_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS if hasattr(builtins, name)}
+restricted_builtins['__import__'] = __import__  # Allow imports for libs
+
 def code_execution(code: str) -> str:
     """Execute Python code safely in a stateful REPL and return output/errors."""
     if 'repl_namespace' not in st.session_state:
-        st.session_state['repl_namespace'] = {'__builtins__': __builtins__}  # Restricted globals
+        st.session_state['repl_namespace'] = {'__builtins__': restricted_builtins}  # Restricted globals
     namespace = st.session_state['repl_namespace']
     old_stdout = sys.stdout
     redirected_output = io.StringIO()
@@ -270,7 +361,7 @@ def memory_insert(user: str, convo_id: int, mem_key: str, mem_value: dict) -> st
         json_value = json.dumps(mem_value)
         c.execute("INSERT OR REPLACE INTO memory (user, convo_id, mem_key, mem_value) VALUES (?, ?, ?, ?)",
                   (user, convo_id, mem_key, json_value))
-        conn.commit()
+        # Defer commit to caller for batching
         # Update cache
         cache_key = f"{user}:{convo_id}:{mem_key}"
         if 'memory_cache' not in st.session_state:
@@ -311,9 +402,11 @@ def memory_query(user: str, convo_id: int, mem_key: str = None, limit: int = 10)
     except Exception as e:
         return f"Error querying memory: {str(e)}"
 
+# Advanced Memory Functions (Brain-inspired) - With vec fallback
 def advanced_memory_consolidate(user: str, convo_id: int, mem_key: str, interaction_data: dict) -> str:
     """Consolidate: Summarize (via Grok call), embed, store hierarchically."""
     try:
+        load_embed_model()  # Ensure loaded
         # Summarize using Grok (simple API call; assume client is available)
         client = OpenAI(api_key=API_KEY, base_url="https://api.x.ai/v1/")
         summary_response = client.chat.completions.create(
@@ -323,9 +416,11 @@ def advanced_memory_consolidate(user: str, convo_id: int, mem_key: str, interact
             stream=False
         )
         summary = summary_response.choices[0].message.content.strip()
-        # Embed full data
-        embed_model = st.session_state['embed_model']
-        embedding = embed_model.encode(json.dumps(interaction_data)).astype(np.float32).tobytes()
+        # Embed full data if vec available
+        embed_model = st.session_state.get('embed_model')
+        embedding = None
+        if embed_model and st.session_state.get('vec_loaded', False):
+            embedding = embed_model.encode(json.dumps(interaction_data)).astype(np.float32).tobytes()
         # Store semantic summary as parent
         semantic_value = {"summary": summary}
         json_semantic = json.dumps(semantic_value)
@@ -337,7 +432,7 @@ def advanced_memory_consolidate(user: str, convo_id: int, mem_key: str, interact
         json_episodic = json.dumps(interaction_data)
         c.execute("INSERT OR REPLACE INTO memory (user, convo_id, mem_key, mem_value, embedding, parent_id, salience, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                   (user, convo_id, mem_key, json_episodic, embedding, parent_id, salience, datetime.now()))
-        conn.commit()
+        # Defer commit
         return "Memory consolidated successfully."
     except Exception as e:
         return f"Error consolidating memory: {str(e)}"
@@ -345,10 +440,22 @@ def advanced_memory_consolidate(user: str, convo_id: int, mem_key: str, interact
 def advanced_memory_retrieve(user: str, convo_id: int, query: str, top_k: int = 5) -> str:
     """Retrieve top-k relevant memories via embedding similarity."""
     try:
-        embed_model = st.session_state['embed_model']
+        load_embed_model()
+        embed_model = st.session_state.get('embed_model')
+        if not embed_model or not st.session_state.get('vec_loaded', False):
+            # Fallback: Retrieve by timestamp
+            c.execute("SELECT mem_key, mem_value, salience FROM memory WHERE user=? AND convo_id=? ORDER BY timestamp DESC LIMIT ?",
+                      (user, convo_id, top_k))
+            results = c.fetchall()
+            retrieved = []
+            for row in results:
+                mem_key, mem_value_json, salience = row
+                value = json.loads(mem_value_json)
+                retrieved.append({"mem_key": mem_key, "value": value, "relevance": float(salience)})
+            return json.dumps(retrieved)
         query_embed = embed_model.encode(query).astype(np.float32)
         query_embed_bytes = query_embed.tobytes()
-        # Query all candidates (full scan with vec function; cosine distance = 1 - sim for normalized vectors)
+        # Query with vec
         c.execute("""
             SELECT mem_key, mem_value, parent_id, salience,
                    vec_distance_cosine(embedding, ?) as distance
@@ -362,14 +469,14 @@ def advanced_memory_retrieve(user: str, convo_id: int, query: str, top_k: int = 
         for row in results:
             mem_key, mem_value_json, parent_id, salience, distance = row
             value = json.loads(mem_value_json)
-            sim = 1 - distance  # Convert distance back to similarity for relevance
-            # Boost salience (plasticity)
+            sim = 1 - distance
+            # Boost salience
             if parent_id:
                 c.execute("UPDATE memory SET salience = salience + 0.1 WHERE rowid = ?", (parent_id,))
             c.execute("UPDATE memory SET salience = salience + 0.1 WHERE user = ? AND convo_id = ? AND mem_key = ?",
                       (user, convo_id, mem_key))
             retrieved.append({"mem_key": mem_key, "value": value, "relevance": float(sim)})
-        conn.commit()
+        # Defer commit
         return json.dumps(retrieved)
     except Exception as e:
         return f"Error retrieving memory: {str(e)}"
@@ -383,11 +490,12 @@ def advanced_memory_prune(user: str, convo_id: int) -> str:
                   (decay_factor, user, convo_id, one_week_ago))
         c.execute("DELETE FROM memory WHERE user=? AND convo_id=? AND salience < 0.1",
                   (user, convo_id))
-        conn.commit()
+        # Defer commit
         return "Memory pruned successfully."
     except Exception as e:
         return f"Error pruning memory: {str(e)}"
 
+# Git Ops Tool - With Cache
 def git_ops(operation: str, repo_path: str = "", **kwargs) -> str:
     """Perform basic Git operations in sandboxed repo."""
     if not repo_path:
@@ -395,38 +503,47 @@ def git_ops(operation: str, repo_path: str = "", **kwargs) -> str:
     safe_repo = os.path.abspath(os.path.normpath(os.path.join(SANDBOX_DIR, repo_path)))
     if not safe_repo.startswith(os.path.abspath(SANDBOX_DIR)):
         return "Invalid repo path."
+    cache_key_args = {'operation': operation, 'repo_path': repo_path, **{k: v for k, v in kwargs.items() if k in ['message', 'name']}}
+    cached = get_cached_tool_result('git_ops', cache_key_args)
+    if cached:
+        return cached
     try:
         if operation == 'init':
             pygit2.init_repository(safe_repo, bare=False)
-            return "Repository initialized."
-        repo = pygit2.Repository(safe_repo)
-        if operation == 'commit':
-            message = kwargs.get('message', 'Default commit')
-            index = repo.index
-            index.add_all()
-            index.write()
-            tree = index.write_tree()
-            author = pygit2.Signature('AI User', 'ai@example.com')
-            committer = author
-            parents = [repo.head.target] if not repo.head_is_unborn else []
-            repo.create_commit('HEAD', author, committer, message, tree, parents)
-            return "Changes committed."
-        elif operation == 'branch':
-            name = kwargs.get('name')
-            if not name:
-                return "Branch name required."
-            commit = repo.head.peel()
-            repo.branches.create(name, commit)
-            return f"Branch '{name}' created."
-        elif operation == 'diff':
-            diff = repo.diff('HEAD')
-            return diff.patch or "No differences."
+            result = "Repository initialized."
         else:
-            return "Unsupported operation."
+            repo = pygit2.Repository(safe_repo)
+            if operation == 'commit':
+                message = kwargs.get('message', 'Default commit')
+                index = repo.index
+                index.add_all()
+                index.write()
+                tree = index.write_tree()
+                author = pygit2.Signature('AI User', 'ai@example.com')
+                committer = author
+                parents = [repo.head.target] if not repo.head_is_unborn else []
+                repo.create_commit('HEAD', author, committer, message, tree, parents)
+                result = "Changes committed."
+            elif operation == 'branch':
+                name = kwargs.get('name')
+                if not name:
+                    return "Branch name required."
+                commit = repo.head.peel()
+                repo.branches.create(name, commit)
+                result = f"Branch '{name}' created."
+            elif operation == 'diff':
+                diff = repo.diff('HEAD')
+                result = diff.patch or "No differences."
+            else:
+                result = "Unsupported operation."
+        set_cached_tool_result('git_ops', cache_key_args, result)
+        return result
     except Exception as e:
-        return f"Git error: {str(e)}"
+        result = f"Git error: {str(e)}"
+        set_cached_tool_result('git_ops', cache_key_args, result)
+        return result
 
-# DB Query Tool - Unchanged
+# DB Query Tool - Unchanged (no cache, as mutating)
 def db_query(db_path: str, query: str, params: list = []) -> str:
     """Interact with local SQLite in sandbox."""
     safe_db = os.path.abspath(os.path.normpath(os.path.join(SANDBOX_DIR, db_path)))
@@ -449,19 +566,22 @@ def db_query(db_path: str, query: str, params: list = []) -> str:
         if db_conn:
             db_conn.close()
 
-# Shell Exec Tool - Unchanged
+# Shell Exec Tool - Tightened Security (no shell=True)
 WHITELISTED_COMMANDS = ['ls', 'grep', 'sed', 'cat', 'echo', 'pwd']  # Add more safe ones as needed
 def shell_exec(command: str) -> str:
     """Run whitelisted shell commands in sandbox."""
-    cmd_parts = command.split()
+    cmd_parts = shlex.split(command)
     if not cmd_parts or cmd_parts[0] not in WHITELISTED_COMMANDS:
         return "Command not whitelisted."
     try:
-        result = subprocess.run(command, shell=True, cwd=SANDBOX_DIR, capture_output=True, text=True, timeout=5)
-        return result.stdout.strip() + ("\nError: " + result.stderr.strip() if result.stderr else "")
+        result = subprocess.run(cmd_parts, cwd=SANDBOX_DIR, capture_output=True, text=True, timeout=5)
+        output = result.stdout.strip()
+        error = result.stderr.strip()
+        return output + ("\nError: " + error if error else "")
     except Exception as e:
         return f"Shell error: {str(e)}"
 
+# Code Lint Tool - Unchanged
 def code_lint(language: str, code: str) -> str:
     """Lint and format code snippets for multiple languages."""
     lang = language.lower()
@@ -472,8 +592,8 @@ def code_lint(language: str, code: str) -> str:
             opts = jsbeautifier.default_options()
             formatted = jsbeautifier.beautify(code, opts)
         elif lang == 'css':
-            opts = cssbeautifier.default_options()
-            formatted = cssbeautifier.beautify(code, opts)
+            opts = jsbeautifier.default_options()
+            formatted = jsbeautifier.beautify(code, opts)  # Uses jsbeautifier for CSS
         elif lang == 'json':
             formatted = json.dumps(json.loads(code), indent=4)
         elif lang == 'yaml':
@@ -518,30 +638,41 @@ def code_lint(language: str, code: str) -> str:
     except Exception as e:
         return f"Lint error: {str(e)}"
 
-# API Simulate Tool - Unchanged
+# API Simulate Tool - With Cache
+def api_simulate(url: str, method: str = 'GET', data: dict = None, mock: bool = True) -> str:
+    """Simulate or perform API calls."""
+    cache_args = {'url': url, 'method': method, 'data': data, 'mock': mock}
+    cached = get_cached_tool_result('api_simulate', cache_args)
+    if cached:
+        return cached
+    if mock:
+        result = json.dumps({"status": "mocked", "url": url, "method": method, "data": data})
+    else:
+        if not any(url.startswith(base) for base in API_WHITELIST):
+            result = "URL not in whitelist."
+        else:
+            try:
+                if method.upper() == 'GET':
+                    resp = requests.get(url, timeout=5)
+                elif method.upper() == 'POST':
+                    resp = requests.post(url, json=data, timeout=5)
+                else:
+                    result = "Unsupported method."
+                    set_cached_tool_result('api_simulate', cache_args, result)
+                    return result
+                resp.raise_for_status()
+                result = resp.text
+            except Exception as e:
+                result = f"API error: {str(e)}"
+    set_cached_tool_result('api_simulate', cache_args, result)
+    return result
+
 API_WHITELIST = [
     'https://jsonplaceholder.typicode.com/',
     'https://api.openweathermap.org/'  # Assuming free basics
 ]  # Add more public APIs
-def api_simulate(url: str, method: str = 'GET', data: dict = None, mock: bool = True) -> str:
-    """Simulate or perform API calls."""
-    if mock:
-        return json.dumps({"status": "mocked", "url": url, "method": method, "data": data})
-    if not any(url.startswith(base) for base in API_WHITELIST):
-        return "URL not in whitelist."
-    try:
-        if method.upper() == 'GET':
-            resp = requests.get(url, timeout=5)
-        elif method.upper() == 'POST':
-            resp = requests.post(url, json=data, timeout=5)
-        else:
-            return "Unsupported method."
-        resp.raise_for_status()
-        return resp.text
-    except Exception as e:
-        return f"API error: {str(e)}"
 
-def langsearch_web_search(query: str, freshness: str = "noLimit", summary: bool = False, count: int = 3) -> str:
+def langsearch_web_search(query: str, freshness: str = "noLimit", summary: bool = False, count: int = 5) -> str:
     """Perform a web search using LangSearch API and return results as JSON."""
     if not LANGSEARCH_API_KEY:
         return "LangSearch API key not set—configure in .env."
@@ -563,6 +694,7 @@ def langsearch_web_search(query: str, freshness: str = "noLimit", summary: bool 
     except Exception as e:
         return f"LangSearch error: {str(e)}"
 
+# Tool Schema for Structured Outputs - Updated count to 5
 TOOLS = [
     {
         "type": "function",
@@ -817,7 +949,7 @@ TOOLS = [
     },
 ]
 
-# API Wrapper with Streaming and Tool Handling (Fixed for Backend Issues) - Unchanged
+# API Wrapper with Streaming and Tool Handling - With batch commit and safe args
 def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, enable_tools=False):
     client = OpenAI(
         api_key=API_KEY,
@@ -840,10 +972,12 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
         max_iterations = 3 
         iteration = 0
         previous_tool_calls = set()
-        progress_metric = 0  # Fixed: Track progress to avoid false loops
+        progress_metric = 0  # Track progress to avoid false loops
+        db_ops = []  # Track for batch commit
         while iteration < max_iterations:
             iteration += 1
             print(f"[LOG] API Call Iteration: {iteration}")  # Debug
+            c.execute("BEGIN")  # Start transaction for batch
             tools_param = TOOLS if enable_tools else None
             response = client.chat.completions.create(
                 model=model,
@@ -871,7 +1005,7 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
             if not tool_calls:
                 break  # Done if no tools
             yield "\nProcessing tools...\n"
-            # Fixed: Batch tools by type for efficiency
+            # Batch tools by type for efficiency
             tool_batches = {}
             current_tool_names = set()
             for tool_call in tool_calls:
@@ -880,7 +1014,7 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
                 if func_name not in tool_batches:
                     tool_batches[func_name] = []
                 tool_batches[func_name].append(tool_call)
-            # Fixed: Robust loop detection with progress check
+            # Robust loop detection with progress check
             if (
                 current_tool_names == previous_tool_calls
                 and len(full_response) == progress_metric
@@ -894,75 +1028,81 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
             for func_name, calls in tool_batches.items():
                 for tool_call in calls:
                     try:
-                        args = json.loads(tool_call.function.arguments)
+                        # Safe args parse
+                        try:
+                            args = json.loads(tool_call.function.arguments)
+                        except:
+                            args = {}
+                            result = "Invalid tool args."
                         if func_name == "fs_read_file":
-                            result = fs_read_file(args['file_path'])
+                            result = fs_read_file(args.get('file_path', ''))
                         elif func_name == "fs_write_file":
-                            result = fs_write_file(args['file_path'], args['content'])
+                            result = fs_write_file(args.get('file_path', ''), args.get('content', ''))
                         elif func_name == "fs_list_files":
                             dir_path = args.get('dir_path', "")
                             result = fs_list_files(dir_path)
                         elif func_name == "fs_mkdir":
-                            result = fs_mkdir(args['dir_path'])
+                            result = fs_mkdir(args.get('dir_path', ''))
                         elif func_name == "get_current_time":
                             sync = args.get('sync', False)
                             fmt = args.get('format', 'iso')
                             result = get_current_time(sync, fmt)
                         elif func_name == "code_execution":
-                            result = code_execution(args['code'])
+                            result = code_execution(args.get('code', ''))
                         elif func_name == "memory_insert":
                             user = st.session_state['user']
                             convo_id = st.session_state.get('current_convo_id', 0)
-                            result = memory_insert(user, convo_id, args['mem_key'], args['mem_value'])
+                            result = memory_insert(user, convo_id, args.get('mem_key', ''), args.get('mem_value', {}))
+                            db_ops.append('memory_insert')
                         elif func_name == "memory_query":
                             user = st.session_state['user']
                             convo_id = st.session_state.get('current_convo_id', 0)
                             mem_key = args.get('mem_key')
                             limit = args.get('limit', 10)
                             result = memory_query(user, convo_id, mem_key, limit)
-                        # Fixed: Handle new tools
                         elif func_name == "git_ops":
-                            operation = args['operation']
-                            repo_path = args['repo_path']
-                            result = git_ops(operation, repo_path, **args)
+                            operation = args.get('operation', '')
+                            repo_path = args.get('repo_path', '')
+                            result = git_ops(operation, repo_path, **{k: v for k, v in args.items() if k in ['message', 'name']})
                         elif func_name == "db_query":
-                            db_path = args['db_path']
-                            query = args['query']
+                            db_path = args.get('db_path', '')
+                            query = args.get('query', '')
                             params = args.get('params', [])
                             result = db_query(db_path, query, params)
                         elif func_name == "shell_exec":
-                            command = args['command']
+                            command = args.get('command', '')
                             result = shell_exec(command)
                         elif func_name == "code_lint":
-                            language = args['language']
-                            code = args['code']
+                            language = args.get('language', '')
+                            code = args.get('code', '')
                             result = code_lint(language, code)
                         elif func_name == "api_simulate":
-                            url = args['url']
+                            url = args.get('url', '')
                             method = args.get('method', 'GET')
                             data = args.get('data')
                             mock = args.get('mock', True)
                             result = api_simulate(url, method, data, mock)
-                        # Fixed: Advanced Memory
                         elif func_name == "advanced_memory_consolidate":
                             user = st.session_state['user']
                             convo_id = st.session_state.get('current_convo_id', 0)
-                            result = advanced_memory_consolidate(user, convo_id, args['mem_key'], args['interaction_data'])
+                            result = advanced_memory_consolidate(user, convo_id, args.get('mem_key', ''), args.get('interaction_data', {}))
+                            db_ops.append('advanced_memory_consolidate')
                         elif func_name == "advanced_memory_retrieve":
                             user = st.session_state['user']
                             convo_id = st.session_state.get('current_convo_id', 0)
-                            query = args['query']
+                            query = args.get('query', '')
                             top_k = args.get('top_k', 5)
                             result = advanced_memory_retrieve(user, convo_id, query, top_k)
                         elif func_name == "advanced_memory_prune":
                             user = st.session_state['user']
                             convo_id = st.session_state.get('current_convo_id', 0)
                             result = advanced_memory_prune(user, convo_id)
+                            db_ops.append('advanced_memory_prune')
                         elif func_name == "langsearch_web_search":
-                            query = args['query']
+                            query = args.get('query', '')
                             freshness = args.get('freshness', "noLimit")
                             summary = args.get('summary', True)
-                            count = args.get('count', 3)
+                            count = args.get('count', 5)
                             result = langsearch_web_search(query, freshness, summary, count)
                         else:
                             result = "Unknown tool."
@@ -974,6 +1114,9 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
                     yield f"\n[Tool Result ({func_name}): {result}]\n"
                     # Append to messages for next iteration
                     current_messages.append({"role": "tool", "content": result, "tool_call_id": tool_call.id})
+            conn.commit()  # Batch commit after tools
+            if db_ops:
+                print(f"[LOG] Batched {len(set(db_ops))} DB ops.")
         if iteration >= max_iterations:
             yield "Max iterations reached—summarizing."
     try:
@@ -997,6 +1140,7 @@ def call_xai_api(model, messages, sys_prompt, stream=True, image_files=None, ena
         time.sleep(5)
         return call_xai_api(model, messages, sys_prompt, stream, image_files, enable_tools)  # Retry
 
+# Login Page - Unchanged
 def login_page():
     st.title("Welcome to PiCoder")
     st.subheader("Login or Register")
@@ -1032,9 +1176,10 @@ def login_page():
                     conn.commit()
                     st.success("Registered! Please login.")
 
+# Chat Page - Fixed history save, prompt cache, always show response
 def chat_page():
     st.title(f"Grok Chat - {st.session_state['user']}")
-    # Sidebar: Settings and History - Unchanged
+    # Sidebar: Settings and History - With prompt cache
     with st.sidebar:
         st.header("Chat Settings")
         model = st.selectbox(
@@ -1042,8 +1187,10 @@ def chat_page():
             ["grok-4", "grok-3-mini", "grok-3", "grok-code-fast-1"],
             key="model_select",
         )  # Extensible
-        # Load Prompt Files Dynamically
-        prompt_files = load_prompt_files()
+        # Load Prompt Files Dynamically - Cached
+        if 'prompt_files' not in st.session_state:
+            st.session_state['prompt_files'] = load_prompt_files()
+        prompt_files = st.session_state['prompt_files']
         if not prompt_files:
             st.warning("No prompt files found in ./prompts/. Add some .txt files!")
             custom_prompt = st.text_area(
@@ -1064,6 +1211,7 @@ def chat_page():
                 height=200,
                 key="prompt_editor",
             )
+        st.session_state['custom_prompt'] = custom_prompt  # Store for lazy load
         # Save Edited Prompt
         with st.form("save_prompt_form"):
             new_filename = st.text_input("Save as (e.g., my-prompt.txt)", value="")
@@ -1076,15 +1224,19 @@ def chat_page():
                     with open(save_path, "a") as f:
                         f.write("\n<3")  # Append heart
                 st.success(f"Saved to {save_path}!")
+                st.session_state['prompt_files'] = load_prompt_files()  # Refresh cache
                 st.rerun()  # Refresh dropdown
-        # Image Upload for Vision (Multi-file support)
+        # Image Upload for Vision (Multi-file support) - Store in session
         uploaded_images = st.file_uploader(
             "Upload Images for Analysis (Vision Models)",
             type=["jpg", "png"],
             accept_multiple_files=True,
         )
+        if uploaded_images:
+            st.session_state['uploaded_images'] = uploaded_images
+        # Enable tools
         enable_tools = st.checkbox(
-            "Enable FS Tools (Sandboxed R/W Access)", value=False
+            "Enable FS Tools (Sandboxed R/W Access)", value=False, key='enable_tools'
         )
         if enable_tools:
             st.info(
@@ -1154,29 +1306,37 @@ def chat_page():
             # Expander for deep thought (streaming/tool output)
             with st.expander("Thinking... (Deep Thought Process)"):
                 thought_container = st.empty()
-                generator = call_xai_api(model, st.session_state['messages'], custom_prompt, stream=True, image_files=uploaded_images if uploaded_images else None, enable_tools=enable_tools)
+                image_files = st.session_state.get('uploaded_images', [])
+                generator = call_xai_api(model, st.session_state['messages'], st.session_state['custom_prompt'], stream=True, image_files=image_files, enable_tools=st.session_state.get('enable_tools', False))
                 full_response = ""
                 for chunk in generator:
                     full_response += chunk
                     thought_container.markdown(full_response, unsafe_allow_html=False)  # Stream into expander
-            # Parse and display final answer outside if marker present
+            # Always display response outside: parse if marker, else full
             marker = "### Final Answer"
+            display_response = full_response
             if marker in full_response:
                 parts = full_response.split(marker, 1)
                 thought_part = parts[0].strip()
                 final_part = marker + (parts[1] if len(parts) > 1 else "")
                 # Update expander with only thought part
                 thought_container.markdown(thought_part, unsafe_allow_html=False)
-                # Display final part outside
-                st.markdown(final_part, unsafe_allow_html=False)
-            # If no marker, full response stays in expander (no additional output outside)
+                display_response = final_part
+            st.markdown(display_response, unsafe_allow_html=False)
         st.session_state['messages'].append({"role": "assistant", "content": full_response})
-        # Save to History (Auto-title from first user message)
+        # Save to History (Fixed: Insert if new, update if existing)
         title = st.session_state['messages'][0]['content'][:50] + "..." if st.session_state['messages'] else "New Chat"
-        c.execute("INSERT INTO history (user, title, messages) VALUES (?, ?, ?)",
-                  (st.session_state['user'], title, json.dumps(st.session_state['messages'])))
-        conn.commit()
-        st.session_state['current_convo_id'] = c.lastrowid  # Set for new chats
+        messages_json = json.dumps(st.session_state['messages'])
+        current_convo_id = st.session_state.get('current_convo_id')
+        if current_convo_id is None:
+            c.execute("INSERT INTO history (user, title, messages) VALUES (?, ?, ?)",
+                      (st.session_state['user'], title, messages_json))
+            conn.commit()
+            st.session_state['current_convo_id'] = c.lastrowid
+        else:
+            c.execute("UPDATE history SET title=?, messages=? WHERE convo_id=?",
+                      (title, messages_json, current_convo_id))
+            conn.commit()
 
 # Load History - Unchanged
 def load_history(convo_id):
