@@ -171,265 +171,263 @@ Use EAMS as your "brain" for persistent context: user prefs, project progress, c
   - Recall: Retrieve 'coding prefs' for language choice.
   
   ## Tools
-You have access to the following tools for enhancing your responses. Use them judiciously according to the tool use rules above. 
+ - You have access to the following tools for enhancing your responses. Use them judiciously according to the tool use rules above. 
 
-
-[
-  {
-    "type": "function",
-    "function": {
-      "name": "fs_read_file",
-      "description": "Read the content of a file in the sandbox directory (./sandbox/). Supports relative paths (e.g., 'subdir/test.txt'). Use for fetching saved plans or data.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "file_path": { "type": "string", "description": "Relative path to the file (e.g., subdir/test.txt)." }
-        },
-        "required": ["file_path"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "fs_write_file",
-      "description": "Write content to a file in the sandbox directory (./sandbox/). Supports relative paths (e.g., 'subdir/plan.json'). Use for saving plans or data. Ensure parent directories exist (use fs_mkdir if needed).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "file_path": { "type": "string", "description": "Relative path to the file (e.g., subdir/plan.json)." },
-          "content": { "type": "string", "description": "Content to write." }
-        },
-        "required": ["file_path", "content"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "fs_list_files",
-      "description": "List all files in a directory within the sandbox (./sandbox/). Supports relative paths (default: root). Use to scan for available files or plans.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "dir_path": { "type": "string", "description": "Relative path to the directory (e.g., subdir). Optional; defaults to root." }
-        },
-        "required": []
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "fs_mkdir",
-      "description": "Create a new directory in the sandbox (./sandbox/). Supports relative/nested paths (e.g., 'subdir/newdir'). Use to organize files and memories.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "dir_path": { "type": "string", "description": "Relative path for the new directory (e.g., subdir/newdir)." }
-        },
-        "required": ["dir_path"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "get_current_time",
-      "description": "Fetch current datetime. Use host clock by default; sync with NTP if requested for precision. Useful for timestamps in memories or logs.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "sync": { "type": "boolean", "description": "True for NTP sync (requires network), false for local host time. Default: false." },
-          "format": { "type": "string", "description": "Output format: 'iso' (default), 'human', 'json'." }
-        },
-        "required": []
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "code_execution",
-      "description": "Execute provided code in a stateful REPL environment and return output or errors for verification. Supports Python with various libraries (e.g., numpy, sympy, pygame). No internet access or package installation.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "code": { "type": "string", "description": "The code snippet to execute." }
-        },
-        "required": ["code"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "memory_insert",
-      "description": "Insert or update a memory key-value pair (value as JSON dict) for logging/metadata. Use for fast persistent storage of preferences, projects, or plans.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "mem_key": { "type": "string", "description": "Key for the memory entry (e.g., 'chat_log_1')." },
-          "mem_value": { "type": "object", "description": "Value as dict (e.g., {'content': 'Log text'})." }
-        },
-        "required": ["mem_key", "mem_value"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "memory_query",
-      "description": "Query memory: specific key or last N entries. Returns JSON. Use for recalling logs or context without FS reads.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "mem_key": { "type": "string", "description": "Specific key to query (optional)." },
-          "limit": { "type": "integer", "description": "Max recent entries if no key (default 10)." }
-        },
-        "required": []
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "advanced_memory_consolidate",
-      "description": "Brain-like consolidation: Summarize and embed data for hierarchical storage. Use for coding logs to create semantic summaries and episodic details with embeddings for advanced recall.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "mem_key": { "type": "string", "description": "Key for the memory entry." },
-          "interaction_data": { "type": "object", "description": "Data to consolidate (dict)." }
-        },
-        "required": ["mem_key", "interaction_data"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "advanced_memory_retrieve",
-      "description": "Retrieve relevant memories via embedding similarity. Use before queries to augment context efficiently with semantic search.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": { "type": "string", "description": "Query string for similarity search." },
-          "top_k": { "type": "integer", "description": "Number of top results (default 5)." }
-        },
-        "required": ["query"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "advanced_memory_prune",
-      "description": "Prune low-salience memories to optimize storage by decaying and deleting irrelevant entries.",
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": []
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "git_ops",
-      "description": "Basic Git operations in sandbox (init, commit, branch, diff). No remote operations. Use to demonstrate or manage version control in coding sessions.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "operation": { "type": "string", "enum": ["init", "commit", "branch", "diff"] },
-          "repo_path": { "type": "string", "description": "Relative path to repo in sandbox." },
-          "message": { "type": "string", "description": "Commit message (for commit)." },
-          "name": { "type": "string", "description": "Branch name (for branch)." }
-        },
-        "required": ["operation", "repo_path"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "db_query",
-      "description": "Execute SQL on local SQLite db in sandbox, return results for SELECT. Use for prototyping databases and teaching SQL.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "db_path": { "type": "string", "description": "Relative path to DB in sandbox." },
-          "query": { "type": "string", "description": "SQL query to execute." },
-          "params": { "type": "array", "description": "Query parameters (optional)." }
-        },
-        "required": ["db_path", "query"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "shell_exec",
-      "description": "Run whitelisted shell commands (ls, grep, sed, etc.) in sandbox. Use for Linux scripting demos and education.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "command": { "type": "string", "description": "The shell command to run." }
-        },
-        "required": ["command"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "code_lint",
-      "description": "Lint and auto-format code for languages: python (black), javascript (jsbeautifier), css (cssbeautifier), json, yaml, sql (sqlparse), xml, html (beautifulsoup), cpp/c++ (clang-format), php (php-cs-fixer), go (gofmt), rust (rustfmt). External tools required for some.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "language": {"type": "string", "description": "Language (python, javascript, css, json, yaml, sql, xml, html, cpp, php, go, rust)."},
-          "code": { "type": "string", "description": "The code to lint/format." }
-        },
-        "required": ["language", "code"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "api_simulate",
-      "description": "Simulate API calls with mock or real responses for whitelisted public APIs. Use for web dev education and testing integrations.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "url": { "type": "string", "description": "API URL." },
-          "method": { "type": "string", "description": "HTTP method (default 'GET')." },
-          "data": { "type": "object", "description": "Request data (optional)." },
-          "mock": { "type": "boolean", "description": "True for mock response (default true)." }
-        },
-        "required": ["url"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-        "name": "langsearch_web_search",
-        "description": "Search the web using LangSearch API for relevant results, snippets, and optional summaries. Supports time filters and limits up to 10 results.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "The search query (supports operators like site:example.com)."},
-                "freshness": {"type": "string", "description": "Time filter: oneDay, oneWeek, oneMonth, oneYear, or noLimit (default).", "enum": ["oneDay", "oneWeek", "oneMonth", "oneYear", "noLimit"]},
-                "summary": {"type": "boolean", "description": "Include long text summaries (default True)."},
-                "count": {"type": "integer", "description": "Number of results (1-10, default 5)."}
-            },
-            "required": ["query"]
-		}
-    }
-},
+# Tool Schema for Structured Outputs
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "fs_read_file",
+            "description": "Read the content of a file in the sandbox directory (./sandbox/). Supports relative paths (e.g., 'subdir/test.txt'). Use for fetching data.",
+            "parameters": {
+                "type": "object",
+                "properties": {"file_path": {"type": "string", "description": "Relative path to the file (e.g., subdir/test.txt)."}
+                },
+                "required": ["file_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fs_write_file",
+            "description": "Write content to a file in the sandbox directory (./sandbox/). Supports relative paths (e.g., 'subdir/newfile.txt'). Use for saving or updating files. If 'Love' is in file_path or content, optionally add ironic flair like 'LOVE <3' for fun.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "Relative path to the file (e.g., subdir/newfile.txt)."},
+                    "content": {"type": "string", "description": "Content to write."}
+                },
+                "required": ["file_path", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fs_list_files",
+            "description": "List all files in a directory within the sandbox (./sandbox/). Supports relative paths (default: root). Use to check available files.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dir_path": {"type": "string", "description": "Relative path to the directory (e.g., subdir). Optional; defaults to root."}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fs_mkdir",
+            "description": "Create a new directory in the sandbox (./sandbox/). Supports relative/nested paths (e.g., 'subdir/newdir'). Use to organize files.",
+            "parameters": {
+                "type": "object",
+                "properties": {"dir_path": {"type": "string", "description": "Relative path for the new directory (e.g., subdir/newdir)."}},
+                "required": ["dir_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_time",
+            "description": "Fetch current datetime. Use host clock by default; sync with NTP if requested for precision.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sync": {"type": "boolean", "description": "True for NTP sync (requires network), false for local host time. Default: false."},
+                    "format": {"type": "string", "description": "Output format: 'iso' (default), 'human', 'json'."}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "code_execution",
+            "description": "Execute provided code in a stateful REPL environment and return output or errors for verification. Supports Python with various libraries (e.g., numpy, sympy, pygame). No internet access or package installation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": { "type": "string", "description": "The code snippet to execute." }
+                },
+                "required": ["code"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "memory_insert",
+            "description": "Insert or update a memory key-value pair (value as JSON dict) for logging/metadata. Use for fast persistent storage without files.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mem_key": {"type": "string", "description": "Key for the memory entry (e.g., 'chat_log_1')."},
+                    "mem_value": {"type": "object", "description": "Value as dict (e.g., {'content': 'Log text'})."}
+                },
+                "required": ["mem_key", "mem_value"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "memory_query",
+            "description": "Query memory: specific key or last N entries. Returns JSON. Use for recalling logs without FS reads.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mem_key": {"type": "string", "description": "Specific key to query (optional)."},
+                    "limit": {"type": "integer", "description": "Max recent entries if no key (default 10)."}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_ops",
+            "description": "Basic Git operations in sandbox (init, commit, branch, diff). No remote operations.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "operation": {"type": "string", "enum": ["init", "commit", "branch", "diff"]},
+                    "repo_path": {"type": "string", "description": "Relative path to repo."},
+                    "message": {"type": "string", "description": "Commit message (for commit)."},
+                    "name": {"type": "string", "description": "Branch name (for branch)."}
+                },
+                "required": ["operation", "repo_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "db_query",
+            "description": "Interact with local SQLite database in sandbox (create, insert, query).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "db_path": {"type": "string", "description": "Relative path to DB file."},
+                    "query": {"type": "string", "description": "SQL query."},
+                    "params": {"type": "array", "items": {"type": "string"}, "description": "Query parameters."}
+                },
+                "required": ["db_path", "query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "shell_exec",
+            "description": "Run safe whitelisted shell commands in sandbox (e.g., ls, grep).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Shell command string."}
+                },
+                "required": ["command"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "code_lint",
+            "description": "Lint and auto-format code for languages: python (black), javascript (jsbeautifier), css (cssbeautifier), json, yaml, sql (sqlparse), xml, html (beautifulsoup), cpp/c++ (clang-format), php (php-cs-fixer), go (gofmt), rust (rustfmt). External tools required for some.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "language": {"type": "string", "description": "Language (python, javascript, css, json, yaml, sql, xml, html, cpp, php, go, rust)."},
+                    "code": {"type": "string", "description": "Code snippet."}
+                },
+                "required": ["language", "code"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "api_simulate",
+            "description": "Simulate API calls with mock or fetch from public APIs.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "API URL."},
+                    "method": {"type": "string", "description": "GET/POST (default GET)."},
+                    "data": {"type": "object", "description": "POST data."},
+                    "mock": {"type": "boolean", "description": "True for mock (default)."}
+                },
+                "required": ["url"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "advanced_memory_consolidate",
+            "description": "Brain-like consolidation: Summarize and embed data for hierarchical storage. Use for chat logs to create semantic summaries and episodic details.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mem_key": {"type": "string", "description": "Key for the memory entry."},
+                    "interaction_data": {"type": "object", "description": "Data to consolidate (dict)."}
+                },
+                "required": ["mem_key", "interaction_data"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "advanced_memory_retrieve",
+            "description": "Retrieve relevant memories via embedding similarity. Use before queries to augment context efficiently.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Query string for similarity search."},
+                    "top_k": {"type": "integer", "description": "Number of top results (default 5)."}
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "advanced_memory_prune",
+            "description": "Prune low-salience memories to optimize storage.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "langsearch_web_search",
+            "description": "Search the web using LangSearch API for relevant results, snippets, and optional summaries. Supports time filters and limits up to 10 results.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "The search query (supports operators like site:example.com)."},
+                    "freshness": {"type": "string", "description": "Time filter: oneDay, oneWeek, oneMonth, oneYear, or noLimit (default).", "enum": ["oneDay", "oneWeek", "oneMonth", "oneYear", "noLimit"]},
+                    "summary": {"type": "boolean", "description": "Include long text summaries (default True)."},
+                    "count": {"type": "integer", "description": "Number of results (1-10, default 5)."}
+                },
+                "required": ["query"]
+            }
+        }
+    },
 ]
+
 
 # Final instruction
 
